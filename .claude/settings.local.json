@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "PowerShell(Copy-Item *)"
+      "PowerShell(Copy-Item *)",
+      "Bash(git -C \"C:\\\\Users\\\\Thiago\\\\Desktop\\\\PrepOs\" remote get-url origin)"
     ]
   }
 }
