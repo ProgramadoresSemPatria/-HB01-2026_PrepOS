@@ -2,7 +2,12 @@
   "permissions": {
     "allow": [
       "PowerShell(Copy-Item *)",
-      "Bash(git -C \"C:\\\\Users\\\\Thiago\\\\Desktop\\\\PrepOs\" remote get-url origin)"
+      "Bash(git -C \"C:\\\\Users\\\\Thiago\\\\Desktop\\\\PrepOs\" remote get-url origin)",
+      "Bash(python -m venv .venv)",
+      "Bash(.venv/Scripts/pip install *)",
+      "Bash(taskkill /F /IM uvicorn.exe)",
+      "Bash(taskkill /F /IM node.exe)",
+      "Bash(taskkill /F /IM python.exe)"
     ]
   }
 }
