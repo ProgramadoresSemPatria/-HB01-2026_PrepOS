@@ -37,11 +37,12 @@ export function UploadPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center py-16 px-4">
-      <div className="w-full max-w-2xl">
+    <div className="flex flex-col items-center py-16 px-4">
+      <div className="w-full">
         <h1 className="text-4xl font-bold text-gray-900 mb-2">Prep AI</h1>
         <p className="text-gray-500 mb-10">
-          Envie seu currículo e a descrição da vaga para descobrir seu match e começar a se preparar.
+          Envie seu currículo e a descrição da vaga para descobrir seu match e
+          começar a se preparar.
         </p>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-6">
@@ -115,7 +116,9 @@ export function UploadPage() {
           <div className="mt-12 flex flex-col gap-6">
             <MatchScore score={data.match_score} summary={data.summary} />
 
-            <h2 className="text-xl font-semibold text-gray-800">Gaps identificados</h2>
+            <h2 className="text-xl font-semibold text-gray-800">
+              Gaps identificados
+            </h2>
             <div className="flex flex-col gap-3">
               {data.gaps.map((gap) => (
                 <GapCard
