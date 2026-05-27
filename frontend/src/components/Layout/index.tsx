@@ -10,8 +10,11 @@ export function Layout() {
         </div>
 
         <nav className="flex flex-col gap-2">
-          <Link to="/upload" className="text-[#ffffff] hover:text-[#3ecf8e]">
-            Upload
+          <Link to="/upload" className="text-[#ffffff] hover:text-[#3ecf8e] flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            <span>Nova análise</span>
           </Link>
           <Link to="/roadmap" className="text-[#ffffff] hover:text-[#3ecf8e]">
             Roadmap
