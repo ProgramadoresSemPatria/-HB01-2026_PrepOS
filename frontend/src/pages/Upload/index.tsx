@@ -39,8 +39,8 @@ export function UploadPage() {
   return (
     <div className="flex flex-col items-center py-16 px-4">
       <div className="w-full">
-        <h1 className="text-4xl font-bold text-gray-900 mb-2">Prep AI</h1>
-        <p className="text-gray-500 mb-10">
+        <h1 className="text-4xl font-bold text-[#ffffff] mb-2">Prep AI</h1>
+        <p className="text-[#9a9a9a] mb-10">
           Envie seu currículo e a descrição da vaga para descobrir seu match e
           começar a se preparar.
         </p>
@@ -48,7 +48,7 @@ export function UploadPage() {
         <form onSubmit={handleSubmit} className="flex flex-col gap-6">
           {/* PDF upload */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-white mb-1">
               Currículo (PDF)
             </label>
             <div
@@ -72,7 +72,7 @@ export function UploadPage() {
 
           {/* Job title */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-white mb-1">
               Cargo alvo
             </label>
             <input
@@ -86,7 +86,7 @@ export function UploadPage() {
 
           {/* Job description */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-white mb-1">
               Descrição da vaga
             </label>
             <textarea
