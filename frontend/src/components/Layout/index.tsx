@@ -1,3 +1,4 @@
+import { Code, Lightbulb, Map, Mic, SquarePen } from "lucide-react";
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { NavLink, Outlet } from "react-router-dom";
@@ -8,106 +9,36 @@ interface NavigationItem {
   icon: ReactNode;
 }
 
+const NAVIGATION_ICONS_SIZE = {
+  size: 18,
+  strokeWidth: 2,
+};
+
 const NAVIGATION_ITEMS: NavigationItem[] = [
   {
-    label: "Upload",
+    label: "Nova análise",
     to: "/upload",
-    icon: (
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        fill="none"
-        viewBox="0 0 24 24"
-        strokeWidth={1.5}
-        stroke="currentColor"
-        className="w-5 h-5"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
-        />
-      </svg>
-    ),
+    icon: <SquarePen {...NAVIGATION_ICONS_SIZE} />,
   },
   {
     label: "Roadmap",
     to: "/roadmap",
-    icon: (
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        fill="none"
-        viewBox="0 0 24 24"
-        strokeWidth={1.5}
-        stroke="currentColor"
-        className="w-5 h-5"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0z"
-        />
-      </svg>
-    ),
+    icon: <Map {...NAVIGATION_ICONS_SIZE} />,
   },
   {
     label: "LeetCode",
     to: "/leetcode",
-    icon: (
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        fill="none"
-        viewBox="0 0 24 24"
-        strokeWidth={1.5}
-        stroke="currentColor"
-        className="w-5 h-5"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5"
-        />
-      </svg>
-    ),
+    icon: <Code {...NAVIGATION_ICONS_SIZE} />,
   },
   {
     label: "Pitch",
     to: "/pitch",
-    icon: (
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        fill="none"
-        viewBox="0 0 24 24"
-        strokeWidth={1.5}
-        stroke="currentColor"
-        className="w-5 h-5"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.383a14.406 14.406 0 01-3 0M14.25 18v-.192c0-.983.658-1.82 1.508-2.316a7.5 7.5 0 10-7.516 0c.85.496 1.508 1.333 1.508 2.316V18"
-        />
-      </svg>
-    ),
+    icon: <Lightbulb {...NAVIGATION_ICONS_SIZE} />,
   },
   {
     label: "Interview",
     to: "/interview",
-    icon: (
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        fill="none"
-        viewBox="0 0 24 24"
-        strokeWidth={1.5}
-        stroke="currentColor"
-        className="w-5 h-5"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"
-        />
-      </svg>
-    ),
+    icon: <Mic {...NAVIGATION_ICONS_SIZE} />,
   },
 ];
 
@@ -255,7 +186,7 @@ export function Layout() {
             {sessions.map((s) => (
               <NavLink
                 key={s.id}
-                to={`/upload?session_id=${s.id}`}
+                to={`/analysis?session_id=${s.id}`}
                 onClick={() => setIsSidebarOpen(false)}
                 className="text-gray-400 hover:text-[#3ecf8e] flex items-center gap-2 group"
               >
