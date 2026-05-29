@@ -50,7 +50,7 @@ const NAVIGATION_ITEMS: NavigationItem[] = [
     icon: <Lightbulb {...NAVIGATION_ICONS_SIZE} />,
   },
   {
-    label: "Interview",
+    label: "Simular Entrevista",
     to: "/interview",
     icon: <Mic {...NAVIGATION_ICONS_SIZE} />,
   },
