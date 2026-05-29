@@ -255,7 +255,7 @@ export function Layout() {
             {sessions.map((s) => (
               <NavLink
                 key={s.id}
-                to={`/upload?session_id=${s.id}`}
+                to={`/analysis?session_id=${s.id}`}
                 onClick={() => setIsSidebarOpen(false)}
                 className="text-gray-400 hover:text-[#3ecf8e] flex items-center gap-2 group"
               >
