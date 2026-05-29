@@ -35,7 +35,7 @@ const NAVIGATION_ITEMS: NavigationItem[] = [
     icon: <ScrollText {...NAVIGATION_ICONS_SIZE} />,
   },
   {
-    label: "Roadmap",
+    label: "Plano de estudos",
     to: "/roadmap",
     icon: <Map {...NAVIGATION_ICONS_SIZE} />,
   },
