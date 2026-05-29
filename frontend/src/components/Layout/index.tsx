@@ -255,7 +255,7 @@ export function Layout() {
                 </div>
               ))
             ) : (
-              <p className="text-xs text-gray-600 italic">
+              <p className="px-2 text-xs text-gray-600 italic">
                 Nenhuma análise recente
               </p>
             )}
