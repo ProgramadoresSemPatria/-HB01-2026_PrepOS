@@ -5,6 +5,7 @@ import {
   Mic,
   SquarePen,
   MoreVertical,
+  ScrollText,
 } from "lucide-react";
 import { useState } from "react";
 import type { ReactNode } from "react";
@@ -27,6 +28,11 @@ const NAVIGATION_ITEMS: NavigationItem[] = [
     label: "Nova análise",
     to: "/upload",
     icon: <SquarePen {...NAVIGATION_ICONS_SIZE} />,
+  },
+  {
+    label: "Resumo da análise",
+    to: "/analysis",
+    icon: <ScrollText {...NAVIGATION_ICONS_SIZE} />,
   },
   {
     label: "Roadmap",
