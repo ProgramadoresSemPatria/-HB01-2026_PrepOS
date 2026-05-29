@@ -26,7 +26,7 @@ const NAVIGATION_ICONS_SIZE = {
 const NAVIGATION_ITEMS: NavigationItem[] = [
   {
     label: "Nova análise",
-    to: "/upload",
+    to: "/new",
     icon: <SquarePen {...NAVIGATION_ICONS_SIZE} />,
   },
   {
@@ -166,7 +166,7 @@ export function Layout() {
               to={item.to}
               onClick={() => {
                 setIsSidebarOpen(false);
-                if (item.to === "/upload") {
+                if (item.to === "/new") {
                   resetSession();
                 }
               }}

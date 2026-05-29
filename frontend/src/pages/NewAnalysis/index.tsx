@@ -3,33 +3,33 @@ import { useNavigate } from "react-router-dom";
 import { useAnalyze } from "../../lib/api";
 import { useSession } from "../../store/session";
 
-export function UploadPage() {
+export function NewAnalysisPage() {
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
   const [jobText, setJobText] = useState("");
   const [jobTitle, setJobTitle] = useState("");
   const [fileName, setFileName] = useState("");
-  
+
   const resetSession = useSession((s) => s.reset);
   const matchScore = useSession((s) => s.matchScore);
   const saveFullSession = useSession((s) => s.saveFullSession);
-  
+
   const { mutate: analyze, isPending, error } = useAnalyze();
 
   function handleSubmit(e: React.SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
-    
+
     if (matchScore !== null) {
       resetSession();
     }
 
     const file = fileRef.current?.files?.[0];
     if (!file || !jobText.trim()) return;
-    
+
     const form = new FormData();
     form.append("pdf_file", file);
     form.append("job_text", jobText);
-    
+
     analyze(form, {
       onSuccess: (res) => {
         saveFullSession({
@@ -40,7 +40,7 @@ export function UploadPage() {
           jobDescription: jobText,
           fileName: fileName,
         });
-        
+
         navigate("/analysis", { state: { fromUpload: true } });
       },
     });
@@ -49,9 +49,7 @@ export function UploadPage() {
   return (
     <div className="w-full max-w-3xl mx-auto flex flex-col items-center">
       <div className="w-full">
-        <h1 className="text-2xl text-white mb-2 font-semibold">
-          Análise de Aderência
-        </h1>
+        <h1 className="text-2xl text-white mb-2 font-semibold">Nova análise</h1>
         <p className="text-gray-400 mb-8">
           Envie seu currículo e a descrição da vaga para descobrir seu match e
           começar a se preparar.

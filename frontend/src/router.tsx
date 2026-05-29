@@ -6,14 +6,14 @@ import { InterviewPage } from "./pages/Interview";
 import { LeetCodePage } from "./pages/LeetCode";
 import { PitchPage } from "./pages/Pitch";
 import { RoadmapPage } from "./pages/Roadmap";
-import { UploadPage } from "./pages/Upload";
+import { NewAnalysisPage } from "./pages/NewAnalysis";
 import { AnalysisPage } from "./pages/Analysis";
 import { useSession } from "./store/session";
 import { Layout } from "./components/Layout";
 
 function RequireAnalysis({ children }: { children: ReactNode }) {
   const matchScore = useSession((s) => s.matchScore);
-  if (matchScore === null) return <Navigate to="/upload" replace />;
+  if (matchScore === null) return <Navigate to="/new" replace />;
   return <>{children}</>;
 }
 
@@ -24,8 +24,8 @@ export function AppRouter() {
     >
       <Routes>
         <Route element={<Layout />}>
-          <Route path="/" element={<Navigate to="/upload" replace />} />
-          <Route path="/upload" element={<UploadPage />} />
+          <Route path="/" element={<Navigate to="/new" replace />} />
+          <Route path="/new" element={<NewAnalysisPage />} />
 
           <Route
             path="/analysis"
