@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+import { useProgress } from "./progress";
+
 export interface Gap {
   id: string;
   skill: string;
@@ -39,14 +41,17 @@ export const useSession = create<SessionState>()(
       setAnalysis: (score, gaps) => set({ matchScore: score, gaps }),
       setJobTitle: (title) => set({ jobTitle: title }),
       setRoadmap: (tasks) => set({ roadmap: tasks }),
-      reset: () =>
+      reset: () => {
+        const prevSessionId = useSession.getState().sessionId;
+        useProgress.getState().resetProgress(prevSessionId);
         set({
           sessionId: crypto.randomUUID(),
           matchScore: null,
           gaps: [],
           jobTitle: "",
           roadmap: [],
-        }),
+        });
+      },
     }),
     { name: "prep-ai-session" }
   )

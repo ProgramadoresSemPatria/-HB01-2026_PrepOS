@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 
 import { GapCard } from "../../components/GapCard";
 import { MatchScore } from "../../components/MatchScore";
-import { useAnalyze } from "../../lib/api";
+import { useAnalyze, useGenerateRoadmap } from "../../lib/api";
 import { useSession } from "../../store/session";
 
 export function UploadPage() {
@@ -16,9 +16,15 @@ export function UploadPage() {
 
   const setAnalysis = useSession((s) => s.setAnalysis);
   const setSessionJobTitle = useSession((s) => s.setJobTitle);
+  const setRoadmap = useSession((s) => s.setRoadmap);
   const matchScore = useSession((s) => s.matchScore);
 
   const { mutate: analyze, isPending, error, data } = useAnalyze();
+  const {
+    mutate: generateRoadmap,
+    isPending: isGeneratingRoadmap,
+    error: roadmapError,
+  } = useGenerateRoadmap();
 
   function isPdf(file: File) {
     return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
@@ -151,18 +157,41 @@ export function UploadPage() {
                   skill={gap.skill}
                   level={gap.level}
                   reason={gap.reason}
-                  onViewContext={(skill) =>
-                    navigate(`/context/${encodeURIComponent(skill)}`)
+                  onViewContext={() =>
+                    navigate(`/context/${encodeURIComponent(gap.id)}`)
                   }
                 />
               ))}
             </div>
 
+            {roadmapError && (
+              <p className="text-red-600 text-sm">
+                {(roadmapError as Error).message}
+              </p>
+            )}
+
             <button
-              onClick={() => navigate("/roadmap")}
-              className="bg-green-600 text-white font-semibold py-3 rounded-xl hover:bg-green-700 transition"
+              disabled={isGeneratingRoadmap}
+              onClick={() => {
+                generateRoadmap(
+                  {
+                    session_id: sessionID,
+                    gaps: data.gaps,
+                    job_title: jobTitle || "Vaga",
+                  },
+                  {
+                    onSuccess: (tasks) => {
+                      setRoadmap(tasks);
+                      navigate("/roadmap");
+                    },
+                  }
+                );
+              }}
+              className="bg-green-600 text-white font-semibold py-3 rounded-xl hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
             >
-              Ver Roadmap de Estudo →
+              {isGeneratingRoadmap
+                ? "Gerando roadmap..."
+                : "Ver Roadmap de Estudo →"}
             </button>
           </div>
         )}

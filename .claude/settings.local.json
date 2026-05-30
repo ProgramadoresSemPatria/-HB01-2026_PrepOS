@@ -7,7 +7,10 @@
       "Bash(.venv/Scripts/pip install *)",
       "Bash(taskkill /F /IM uvicorn.exe)",
       "Bash(taskkill /F /IM node.exe)",
-      "Bash(taskkill /F /IM python.exe)"
+      "Bash(taskkill /F /IM python.exe)",
+      "Bash(git remote *)",
+      "Bash(gh pr create --title 'feat: implement F04 — roadmap generation with persistence and session sync' --base main --body ' *)",
+      "Bash(npm run *)"
     ]
   }
 }
