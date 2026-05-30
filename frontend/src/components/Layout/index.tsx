@@ -239,7 +239,7 @@ export function Layout() {
 
       <main
         className={`flex-1 h-screen overflow-y-auto relative p-6 pt-24 md:p-10 md:pt-10 transition-all duration-300 ${
-          isDesktopCollapsed ? "md:ml-20" : "md:ml-64"
+          isDesktopCollapsed ? "md:ml-20" : "md:ml-72"
         }`}
       >
         <Outlet />
