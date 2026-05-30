@@ -1,4 +1,5 @@
 from typing import Literal
+from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
@@ -6,6 +7,7 @@ from pydantic import BaseModel, Field
 # ── Analyze ──────────────────────────────────────────────────────────────────
 
 class Gap(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid4()))
     skill: str
     level: Literal["critical", "moderate"]
     reason: str
@@ -20,6 +22,7 @@ class AnalyzeResponse(BaseModel):
 # ── Roadmap ───────────────────────────────────────────────────────────────────
 
 class RoadmapRequest(BaseModel):
+    session_id: str
     gaps: list[Gap]
     job_title: str
 
