@@ -24,5 +24,8 @@ class Analysis(SQLModel, table=True):
     code_challenges: list | None = Field(default=None, sa_column=Column(JSON))
     pitch: list | None = Field(default=None, sa_column=Column(JSON))
     interview_questions: dict | None = Field(default=None, sa_column=Column(JSON))
+    # Histórico das rodadas da entrevista (até 3), alimentado a cada avaliação e
+    # consumido pelo resumo final. Cada item segue o schema InterviewRound.
+    interview_rounds: list | None = Field(default=None, sa_column=Column(JSON))
 
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

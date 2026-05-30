@@ -1,12 +1,15 @@
 import { useState, useRef, useEffect } from 'react';
-import { Bot, Mic, VolumeX, RotateCcw, ThumbsUp, Target, ArrowRight } from 'lucide-react';
+import { Bot, Mic, VolumeX, RotateCcw, ThumbsUp, Target, ArrowRight, Send, Award } from 'lucide-react';
 import { useSession } from '../../store/session';
 import {
   useAnalysisInterviewQuestions,
   useEvaluateInterviewAnswer,
+  useInterviewSummary,
   useInterviewTTS,
   type InterviewEvaluateResponse,
 } from '../../lib/api';
+
+const TOTAL_ROUNDS = 3;
 
 declare global {
   interface Window {
@@ -74,13 +77,28 @@ export function InterviewPage() {
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const questions =
+  const [isFinished, setIsFinished] = useState(false);
+  const [sttSupported, setSttSupported] = useState(true);
+  const [sttError, setSttError] = useState<string | null>(null);
+  // A simulação tem exatamente TOTAL_ROUNDS rodadas: usamos as 3 primeiras
+  // perguntas (sem ciclar) e encerramos com o resumo final.
+  const allQuestions =
     questionsData?.questions && questionsData.questions.length > 0
       ? questionsData.questions
       : MOCK_QUESTIONS;
-  const question = questions[currentQuestionIndex % questions.length];
+  const questions = allQuestions.slice(0, TOTAL_ROUNDS);
+  const round = currentQuestionIndex + 1;
+  const isLastRound = currentQuestionIndex >= questions.length - 1;
+  const question = questions[currentQuestionIndex];
   const [evaluation, setEvaluation] = useState<InterviewEvaluateResponse | null>(null);
   const recognitionRef = useRef<any>(null);
+
+  // Resumo final: só dispara quando a simulação termina (isFinished).
+  const {
+    data: summary,
+    isLoading: isSummaryLoading,
+    isError: isSummaryError,
+  } = useInterviewSummary(analysisId, isFinished);
 
   // ── TTS via Web Audio API: o "recrutador" fala a pergunta (voz "alloy") ─────
   // Fluxo: fetch (ReadableStream → ArrayBuffer) → decodeAudioData → playback.
@@ -165,41 +183,61 @@ export function InterviewPage() {
 
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = true;
-      recognitionRef.current.interimResults = true;
-      recognitionRef.current.lang = 'pt-BR';
-
-      recognitionRef.current.onresult = (event: any) => {
-        let currentTranscript = '';
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          currentTranscript += event.results[i][0].transcript;
-        }
-        setTranscript(currentTranscript);
-      };
-
-      recognitionRef.current.onerror = (event: any) => {
-        console.error("Erro no reconhecimento de voz:", event.error);
-        setIsRecording(false);
-      };
-    }
-  }, []);
-
-  const toggleRecording = () => {
-    if (!recognitionRef.current) {
-      alert("Seu navegador não suporta reconhecimento de voz nativo. Use Chrome ou Edge.");
+    if (!SpeechRecognition) {
+      // Web Speech API não existe em Firefox/Safari: degrada para resposta digitada.
+      setSttSupported(false);
       return;
     }
+
+    recognitionRef.current = new SpeechRecognition();
+    recognitionRef.current.continuous = true;
+    recognitionRef.current.interimResults = true;
+    recognitionRef.current.lang = 'pt-BR';
+
+    recognitionRef.current.onresult = (event: any) => {
+      let currentTranscript = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        currentTranscript += event.results[i][0].transcript;
+      }
+      setTranscript(currentTranscript);
+    };
+
+    recognitionRef.current.onerror = (event: any) => {
+      console.error("Erro no reconhecimento de voz:", event.error);
+      const messages: Record<string, string> = {
+        'not-allowed': 'Acesso ao microfone negado. Libere a permissão no navegador e tente novamente.',
+        'no-speech': 'Não captamos nenhuma fala. Clique no microfone e responda novamente.',
+        'audio-capture': 'Microfone não encontrado. Verifique o dispositivo de áudio.',
+      };
+      setSttError(messages[event.error] ?? 'Falha no reconhecimento de voz. Tente novamente.');
+      // Reseta o estado para não travar a UI em "gravando" / "analisando".
+      setIsRecording(false);
+      setIsEvaluating(false);
+    };
+  }, []);
+
+  const submitAnswer = () => {
+    // Guarda: não queima tokens da IA com transcript vazio/irrelevante.
+    if (transcript.trim().length < 2) {
+      setSttError('Sua resposta está vazia. Grave ou digite antes de enviar.');
+      return;
+    }
+    setSttError(null);
+    setIsEvaluating(true);
+    handleEvaluate();
+  };
+
+  const toggleRecording = () => {
+    if (!recognitionRef.current) return;
 
     if (isRecording) {
       recognitionRef.current.stop();
       setIsRecording(false);
-      setIsEvaluating(true);
-      handleEvaluate();
+      submitAnswer();
     } else {
       setTranscript('');
       setEvaluation(null);
+      setSttError(null);
       recognitionRef.current.start();
       setIsRecording(true);
     }
@@ -207,7 +245,7 @@ export function InterviewPage() {
 
   const handleEvaluate = () => {
     evaluateAnswer(
-      { question, transcript, gaps: gapSkills },
+      { question, transcript, gaps: gapSkills, round },
       {
         onSuccess: (res) => {
           setEvaluation(res);
@@ -215,15 +253,21 @@ export function InterviewPage() {
         },
         onError: () => {
           setIsEvaluating(false);
+          setSttError('Não foi possível avaliar a resposta. Tente novamente.');
         },
       }
     );
   };
 
   const handleNextQuestion = () => {
+    if (isLastRound) {
+      setIsFinished(true);
+      return;
+    }
     setEvaluation(null);
     setTranscript('');
-    setCurrentQuestionIndex((prev) => (prev + 1) % questions.length);
+    setSttError(null);
+    setCurrentQuestionIndex((prev) => prev + 1);
   };
 
   return (
@@ -248,14 +292,78 @@ export function InterviewPage() {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#3ecf8e] opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#3ecf8e]"></span>
             </span>
-            <span className="text-gray-300 text-sm font-medium">Gravador Ativo</span>
+            <span className="text-gray-300 text-sm font-medium">
+              {isFinished ? 'Sessão concluída' : `Rodada ${round} de ${questions.length}`}
+            </span>
           </div>
         )}
       </header>
 
-      {isStarted ? (
+      {isStarted && isFinished ? (
         <main className="flex-1 flex flex-col items-center p-4">
-          
+          <div className="w-full max-w-3xl bg-[#202020] rounded-2xl p-6 md:p-8 border border-gray-700 shadow-xl animate-fade-in-up">
+            <div className="flex flex-col items-center text-center mb-8 border-b border-gray-800 pb-8">
+              <div className="w-16 h-16 mb-4 bg-[#3ecf8e]/10 rounded-full flex items-center justify-center text-[#3ecf8e]">
+                <Award size={30} />
+              </div>
+              <h3 className="text-2xl font-bold text-white">Resultado Final</h3>
+              <p className="text-sm text-gray-400 mt-1">Resumo consolidado das suas {questions.length} rodadas</p>
+            </div>
+
+            {isSummaryLoading && (
+              <div className="flex flex-col items-center gap-4 py-10">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#3ecf8e]"></div>
+                <p className="text-gray-400 text-sm">Consolidando seu desempenho...</p>
+              </div>
+            )}
+
+            {isSummaryError && (
+              <div className="text-center py-10">
+                <p className="text-amber-400 text-sm">Não foi possível gerar o resumo final. Tente recarregar a página.</p>
+              </div>
+            )}
+
+            {summary && (
+              <>
+                <div className="flex justify-center mb-8">
+                  <div className="bg-[#3ecf8e]/10 text-[#3ecf8e] border border-[#3ecf8e]/20 px-8 py-4 rounded-2xl text-center">
+                    <p className="text-xs uppercase tracking-widest text-[#3ecf8e]/70 mb-1">Nota Geral</p>
+                    <p className="font-bold text-3xl">{summary.overall_score_1_5} / 5</p>
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-6 mb-8">
+                  <div className="bg-[#171717] p-5 rounded-xl border border-gray-800">
+                    <h4 className="text-emerald-400 font-bold mb-4 flex items-center gap-2">
+                      <span className="bg-emerald-500/20 p-1.5 rounded text-emerald-400"><ThumbsUp size={15} /></span> Pontos Fortes
+                    </h4>
+                    <ul className="list-disc pl-4 text-sm text-gray-300 space-y-2">
+                      {summary.strengths.map((str, i) => <li key={i}>{str}</li>)}
+                    </ul>
+                  </div>
+                  <div className="bg-[#171717] p-5 rounded-xl border border-gray-800">
+                    <h4 className="text-amber-400 font-bold mb-4 flex items-center gap-2">
+                      <span className="bg-amber-500/20 p-1.5 rounded text-amber-400"><Target size={15} /></span> A Melhorar
+                    </h4>
+                    <ul className="list-disc pl-4 text-sm text-gray-300 space-y-2">
+                      {summary.improvements.map((imp, i) => <li key={i}>{imp}</li>)}
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="bg-blue-500/5 border border-blue-500/20 p-5 rounded-xl">
+                  <p className="text-sm text-gray-300 leading-relaxed">
+                    <strong className="text-blue-400 block mb-1">Conselho Final:</strong>
+                    {summary.final_tip}
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
+        </main>
+      ) : isStarted ? (
+        <main className="flex-1 flex flex-col items-center p-4">
+
           <div className="text-center mb-12 max-w-3xl">
             <div
               className={`w-24 h-24 bg-[#202020] border-2 rounded-full mx-auto flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(62,207,142,0.15)] transition-all ${
@@ -317,31 +425,64 @@ export function InterviewPage() {
               <p className="mb-4 text-xs font-bold uppercase tracking-[0.2em] text-[#3ecf8e]">
                 Sua vez de responder
               </p>
-              <button
-                onClick={toggleRecording}
-                disabled={isEvaluating}
-                className={`w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 ${
-                  isRecording
-                    ? 'bg-red-500/20 text-red-500 border-2 border-red-500 shadow-[0_0_30px_rgba(239,68,68,0.4)] scale-110'
-                    : isEvaluating
-                    ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
-                    : 'bg-[#202020] hover:bg-[#2a2a2a] text-[#3ecf8e] border border-gray-700'
-                }`}
-              >
-                {isEvaluating ? (
-                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-500"></div>
-                ) : (
-                  <Mic size={30} />
-                )}
-              </button>
-              
-              <p className="mt-5 text-gray-400 text-sm font-medium">
-                {isRecording 
-                  ? 'Ouvindo... Clique novamente para finalizar' 
-                  : isEvaluating
-                  ? 'Analisando sua resposta...'
-                  : 'Clique no microfone para responder'}
-              </p>
+
+              {sttSupported ? (
+                <>
+                  <button
+                    onClick={toggleRecording}
+                    disabled={isEvaluating}
+                    className={`w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 ${
+                      isRecording
+                        ? 'bg-red-500/20 text-red-500 border-2 border-red-500 shadow-[0_0_30px_rgba(239,68,68,0.4)] scale-110'
+                        : isEvaluating
+                        ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                        : 'bg-[#202020] hover:bg-[#2a2a2a] text-[#3ecf8e] border border-gray-700'
+                    }`}
+                  >
+                    {isEvaluating ? (
+                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-500"></div>
+                    ) : (
+                      <Mic size={30} />
+                    )}
+                  </button>
+
+                  <p className="mt-5 text-gray-400 text-sm font-medium">
+                    {isRecording
+                      ? 'Ouvindo... Clique novamente para finalizar'
+                      : isEvaluating
+                      ? 'Analisando sua resposta...'
+                      : 'Clique no microfone para responder'}
+                  </p>
+                </>
+              ) : (
+                // Fallback para navegadores sem Web Speech API (Firefox/Safari):
+                // garante a resposta por digitação.
+                <div className="w-full max-w-3xl">
+                  <textarea
+                    value={transcript}
+                    onChange={(e) => setTranscript(e.target.value)}
+                    disabled={isEvaluating}
+                    rows={5}
+                    placeholder="Seu navegador não suporta voz. Digite sua resposta aqui..."
+                    className="w-full bg-[#171717] border border-gray-700 rounded-xl p-4 text-gray-200 text-base leading-relaxed focus:outline-none focus:border-[#3ecf8e]/50 resize-none"
+                  />
+                  <button
+                    onClick={submitAnswer}
+                    disabled={isEvaluating}
+                    className="mt-4 w-full bg-[#3ecf8e] hover:bg-[#36b37e] disabled:bg-gray-800 disabled:text-gray-500 text-black px-6 py-3 rounded-xl font-bold transition-colors flex items-center justify-center gap-2"
+                  >
+                    {isEvaluating ? (
+                      <><div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-500"></div> Analisando...</>
+                    ) : (
+                      <><Send size={18} /> Enviar Resposta</>
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {sttError && (
+                <p className="mt-5 text-amber-400 text-sm font-medium text-center max-w-md">{sttError}</p>
+              )}
             </div>
           )}
 
@@ -364,7 +505,20 @@ export function InterviewPage() {
                   Nota: {evaluation.score_1_5} / 5
                 </div>
               </div>
-              
+
+              <div className="grid grid-cols-3 gap-3 mb-8">
+                {[
+                  { label: 'Clareza', value: evaluation.clarity_1_5 },
+                  { label: 'STAR', value: evaluation.star_1_5 },
+                  { label: 'Técnico', value: evaluation.technical_1_5 },
+                ].map((dim) => (
+                  <div key={dim.label} className="bg-[#171717] border border-gray-800 rounded-xl px-3 py-4 text-center">
+                    <p className="text-xs uppercase tracking-wider text-gray-500 mb-1">{dim.label}</p>
+                    <p className="text-2xl font-bold text-white">{dim.value}<span className="text-sm text-gray-500"> / 5</span></p>
+                  </div>
+                ))}
+              </div>
+
               <div className="grid md:grid-cols-2 gap-6 mb-8">
                 <div className="bg-[#171717] p-5 rounded-xl border border-gray-800">
                   <h4 className="text-emerald-400 font-bold mb-4 flex items-center gap-2">
@@ -393,12 +547,21 @@ export function InterviewPage() {
               </div>
 
               <div className="flex justify-center">
-                <button 
+                <button
                   onClick={handleNextQuestion}
                   className="bg-[#171717] hover:bg-[#2a2a2a] border border-gray-700 text-white px-6 py-3 rounded-xl font-medium transition-colors flex items-center gap-2 group"
                 >
-                  Próxima Pergunta
-                  <ArrowRight size={18} className="group-hover:translate-x-0.5 transition-transform" />
+                  {isLastRound ? (
+                    <>
+                      Ver Resultado Final
+                      <Award size={18} className="group-hover:scale-110 transition-transform" />
+                    </>
+                  ) : (
+                    <>
+                      Próxima Pergunta
+                      <ArrowRight size={18} className="group-hover:translate-x-0.5 transition-transform" />
+                    </>
+                  )}
                 </button>
               </div>
             </div>

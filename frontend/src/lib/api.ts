@@ -60,10 +60,21 @@ export interface PitchCard {
 }
 
 export interface InterviewEvaluateResponse {
+  clarity_1_5: number;
+  star_1_5: number;
+  technical_1_5: number;
   score_1_5: number;
   strengths: string[];
   improvements: string[];
   tip: string;
+}
+
+export interface InterviewSummaryResponse {
+  overall_score_1_5: number;
+  rounds_completed: number;
+  strengths: string[];
+  improvements: string[];
+  final_tip: string;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -170,6 +181,7 @@ export function useEvaluateInterviewAnswer(analysisId: string) {
       question: string;
       transcript: string;
       gaps: string[];
+      round: number;
     }) =>
       apiRequest<InterviewEvaluateResponse>(
         `${API}/analysis/${analysisId}/evaluate-interview-answer`,
@@ -179,6 +191,23 @@ export function useEvaluateInterviewAnswer(analysisId: string) {
           body: JSON.stringify(body),
         }
       ),
+  });
+}
+
+/**
+ * Busca o resumo final consolidado das rodadas da entrevista. Disparado sob
+ * demanda (enabled) ao término da simulação — o backend gera sem cache.
+ */
+export function useInterviewSummary(analysisId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["interview-summary", analysisId],
+    queryFn: () =>
+      apiRequest<InterviewSummaryResponse>(
+        `${API}/analysis/${analysisId}/interview-summary`
+      ),
+    enabled: !!analysisId && enabled,
+    retry: false,
+    staleTime: Infinity,
   });
 }
 

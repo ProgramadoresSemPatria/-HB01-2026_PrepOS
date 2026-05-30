@@ -15,7 +15,9 @@ from models.schemas import (
     EvaluateSolutionRequest,
     Gap,
     InterviewEvaluateResponse,
+    InterviewRound,
     InterviewStartResponse,
+    InterviewSummaryResponse,
     LeetCodeEvaluateResponse,
     LeetCodeProblem,
     PitchCard,
@@ -217,7 +219,50 @@ async def evaluate_interview_answer(
     llm: LLMService = Depends(),
     db: Session = Depends(get_session),
 ) -> InterviewEvaluateResponse:
-    if db.get(Analysis, analysis_id) is None:
+    analysis = db.get(Analysis, analysis_id)
+    if analysis is None:
         raise HTTPException(status_code=404, detail="Análise não encontrada.")
 
-    return await llm.evaluate_interview(req.question, req.transcript, req.gaps, round=1)
+    evaluation = await llm.evaluate_interview(
+        req.question, req.transcript, req.gaps, round=req.round
+    )
+
+    # Upsert por round no histórico: refazer uma rodada substitui o item antigo
+    # em vez de duplicar, mantendo no máximo 3 rodadas ordenadas.
+    record = InterviewRound(
+        round=req.round,
+        question=req.question,
+        transcript=req.transcript,
+        evaluation=evaluation,
+    ).model_dump()
+    rounds = [r for r in (analysis.interview_rounds or []) if r["round"] != req.round]
+    rounds.append(record)
+    analysis.interview_rounds = sorted(rounds, key=lambda r: r["round"])
+    db.add(analysis)
+    db.commit()
+
+    return evaluation
+
+
+@router.get(
+    "/analysis/{analysis_id}/interview-summary",
+    response_model=InterviewSummaryResponse,
+)
+async def get_interview_summary(
+    analysis_id: str,
+    llm: LLMService = Depends(),
+    db: Session = Depends(get_session),
+) -> InterviewSummaryResponse:
+    analysis = db.get(Analysis, analysis_id)
+    if analysis is None:
+        raise HTTPException(status_code=404, detail="Análise não encontrada.")
+
+    rounds = analysis.interview_rounds or []
+    if not rounds:
+        raise HTTPException(
+            status_code=409,
+            detail="Nenhuma rodada avaliada ainda — responda ao menos uma pergunta.",
+        )
+
+    # Gerado sob demanda (sem cache): refazer uma rodada deve refletir no resumo.
+    return await llm.summarize_interview([InterviewRound(**r) for r in rounds])
