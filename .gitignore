@@ -16,3 +16,7 @@ backend/.env
 # OS
 .DS_Store
 Thumbs.db
+
+# Local DB / runtime artifacts
+*.db
+*.log
