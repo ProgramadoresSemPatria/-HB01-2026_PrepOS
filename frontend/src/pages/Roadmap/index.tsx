@@ -1,9 +1,11 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { CalendarPlus, Check } from "lucide-react";
 
 import { RoadmapDaysView } from "../../components/RoadmapDaysView";
 import { RoadmapProgressBar } from "../../components/RoadmapProgressBar";
 import { useAnalysisRoadmap } from "../../lib/api";
+import { buildRoadmapIcs, buildRoadmapPlainText } from "../../lib/ics";
 import {
   countCompletedDays,
   groupByDay,
@@ -19,7 +21,10 @@ export function RoadmapPage() {
   const sessionId = useSession((s) => s.sessionId);
   const analysisId = useSession((s) => s.analysisId);
   const roadmap = useSession((s) => s.roadmap);
+  const gaps = useSession((s) => s.gaps);
   const setRoadmap = useSession((s) => s.setRoadmap);
+
+  const [exportFeedback, setExportFeedback] = useState<string | null>(null);
 
   const bySession = useProgress((s) => s.bySession);
   const toggleTask = useProgress((s) => s.toggleTask);
@@ -54,6 +59,33 @@ export function RoadmapPage() {
 
   function handleViewContext(gapId: string) {
     navigate(`/context/${encodeURIComponent(gapId)}`);
+  }
+
+  async function handleExportCalendar() {
+    try {
+      const ics = buildRoadmapIcs(tasksByDay, gaps);
+      const blob = new Blob([ics], { type: "text/calendar" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "roadmap-prepos.ics";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setExportFeedback("Calendário baixado (.ics)");
+    } catch {
+      // Fallback: copia o roadmap em texto para a área de transferência.
+      try {
+        await navigator.clipboard.writeText(
+          buildRoadmapPlainText(tasksByDay, gaps),
+        );
+        setExportFeedback("Download indisponível — roadmap copiado para a área de transferência");
+      } catch {
+        setExportFeedback("Não foi possível exportar o calendário");
+      }
+    }
+    setTimeout(() => setExportFeedback(null), 4000);
   }
 
   const isLoading = isFetching && roadmap.length === 0;
@@ -110,10 +142,28 @@ export function RoadmapPage() {
 
       {!isLoading && roadmap.length > 0 && (
         <div className="flex flex-col gap-4">
-          <RoadmapProgressBar
-            completedDays={completedDays}
-            totalDays={TOTAL_DAYS}
-          />
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="flex-1">
+              <RoadmapProgressBar
+                completedDays={completedDays}
+                totalDays={TOTAL_DAYS}
+              />
+            </div>
+            <button
+              onClick={handleExportCalendar}
+              className="flex items-center justify-center gap-2 bg-[#202020] hover:bg-[#2a2a2a] border border-gray-700 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition-colors shrink-0"
+            >
+              <CalendarPlus size={16} strokeWidth={2} />
+              Exportar para calendário
+            </button>
+          </div>
+
+          {exportFeedback && (
+            <p className="flex items-center gap-2 text-sm text-[#3ecf8e] bg-[#3ecf8e]/10 border border-[#3ecf8e]/20 px-4 py-2.5 rounded-lg">
+              <Check size={16} strokeWidth={2} className="shrink-0" />
+              {exportFeedback}
+            </p>
+          )}
 
           <RoadmapDaysView
             tasksByDay={tasksByDay}
