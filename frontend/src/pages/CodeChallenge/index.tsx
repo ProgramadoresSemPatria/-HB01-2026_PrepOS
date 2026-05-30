@@ -79,7 +79,7 @@ export function CodeChallengePage() {
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto h-full flex flex-col pb-6">
+    <div className="w-full h-full flex flex-col pb-6">
       <header className="mb-8 border-b border-gray-800 pb-6">
         <h1 className="text-3xl font-bold text-white">Laboratório de Código</h1>
         <p className="text-[#9a9a9a] mt-2">

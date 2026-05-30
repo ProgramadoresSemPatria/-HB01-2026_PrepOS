@@ -301,7 +301,9 @@ export function Layout() {
           isDesktopCollapsed ? "md:ml-20" : "md:ml-72"
         }`}
       >
-        <Outlet />
+        <div className="w-full max-w-3xl mx-auto">
+          <Outlet />
+        </div>
       </main>
     </div>
   );

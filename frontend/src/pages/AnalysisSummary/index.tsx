@@ -72,8 +72,11 @@ export function AnalysisSummaryPage() {
   }, [matchScore, isNewAnalysis]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }, [chatStep]); 
+    messagesEndRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+    });
+  }, [chatStep]);
 
   if (matchScore === null) {
     return (
@@ -86,7 +89,7 @@ export function AnalysisSummaryPage() {
   }
 
   return (
-    <div className="w-full max-w-4xl mx-auto flex flex-col pb-12 px-2 md:px-0">
+    <div className="w-full flex flex-col pb-6 px-2 md:px-0">
       <header className="mb-8 border-b border-gray-800 pb-6 text-center">
         <h1 className="text-2xl text-white font-semibold">Análise de Perfil</h1>
         <p className="text-gray-400 mt-1 text-sm">
@@ -172,9 +175,9 @@ export function AnalysisSummaryPage() {
         {chatStep >= 6 && (
           <AiBubble>
             <p className="text-gray-300 leading-relaxed text-sm md:text-base mb-6">
-              Aqui está o resultado da nossa análise inicial! Esta pontuação indica
-              o quão aderente o seu perfil está em relação às exigências da
-              vaga:
+              Aqui está o resultado da nossa análise inicial! Esta pontuação
+              indica o quão aderente o seu perfil está em relação às exigências
+              da vaga:
             </p>
             <MatchScore score={matchScore} summary={summary} />
           </AiBubble>
