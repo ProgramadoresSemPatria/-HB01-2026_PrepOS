@@ -68,6 +68,13 @@ export interface PitchCard {
   result: string;
   vaga_connection: string;
   relevance: string;
+  relevance_level: "alta" | "media";
+}
+
+export interface StrategicQuestion {
+  question: string;
+  type: "cultura" | "tecnico" | "desafios";
+  why_strategic: string;
 }
 
 export interface InterviewEvaluateResponse {
@@ -160,6 +167,35 @@ export function useAnalysisPitch(analysisId: string) {
     enabled: !!analysisId,
     retry: false,
     staleTime: Infinity,
+  });
+}
+
+export function useStrategicQuestions(analysisId: string) {
+  return useQuery({
+    queryKey: ["analysis-strategic-questions", analysisId],
+    queryFn: () =>
+      apiRequest<StrategicQuestion[]>(
+        `${API}/analysis/${encodeURIComponent(analysisId)}/strategic-questions`,
+      ),
+    enabled: !!analysisId,
+    retry: false,
+    staleTime: Infinity,
+  });
+}
+
+export function useRegenerateStrategicQuestions(analysisId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      apiRequest<StrategicQuestion[]>(
+        `${API}/analysis/${encodeURIComponent(analysisId)}/strategic-questions?refresh=true`,
+      ),
+    onSuccess: (data) => {
+      queryClient.setQueryData(
+        ["analysis-strategic-questions", analysisId],
+        data,
+      );
+    },
   });
 }
 
