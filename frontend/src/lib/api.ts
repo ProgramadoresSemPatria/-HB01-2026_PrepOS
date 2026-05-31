@@ -1,10 +1,9 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-const API = import.meta.env.VITE_API_URL as string;
-
-// ── Types ─────────────────────────────────────────────────────────────────────
+const API = import.meta.env.VITE_API_URL ?? "http://127.0.0.1:8000";
 
 export interface Gap {
+  id: string;
   skill: string;
   level: "critical" | "moderate";
   reason: string;
@@ -14,6 +13,26 @@ export interface AnalyzeResponse {
   match_score: number;
   gaps: Gap[];
   summary: string;
+}
+
+export interface AnalysisResult extends AnalyzeResponse {
+  analysisId: string;
+}
+
+export interface AnalysisCreateResponse {
+  analysis_id: string;
+}
+
+export interface ResumeMeta {
+  filename: string;
+  content_type: string;
+  url: string;
+}
+
+export interface AnalysisDetailResponse {
+  job_title: string;
+  job_description: string;
+  resume: ResumeMeta;
 }
 
 export interface RoadmapTask {
@@ -36,16 +55,9 @@ export interface LeetCodeProblem {
   title: string;
   difficulty: "Easy" | "Medium" | "Hard";
   category: string;
+  url: string;
+  description: string;
   reason: string;
-}
-
-export interface LeetCodeEvaluateResponse {
-  correct: boolean;
-  time_complexity: string;
-  space_complexity: string;
-  strengths: string[];
-  improvements: string[];
-  optimal_hint: string;
 }
 
 export interface PitchCard {
@@ -56,43 +68,257 @@ export interface PitchCard {
   result: string;
   vaga_connection: string;
   relevance: string;
+  relevance_level: "alta" | "media";
+}
+
+export interface StrategicQuestion {
+  question: string;
+  type: "cultura" | "tecnico" | "desafios";
+  why_strategic: string;
 }
 
 export interface InterviewEvaluateResponse {
+  clarity_1_5: number;
+  star_1_5: number;
+  technical_1_5: number;
   score_1_5: number;
   strengths: string[];
   improvements: string[];
   tip: string;
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-async function apiRequest<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, init);
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: "Erro desconhecido." }));
-    throw new Error((err as { detail: string }).detail ?? "Erro na requisição.");
-  }
-  return res.json() as Promise<T>;
+export interface InterviewSummaryResponse {
+  overall_score_1_5: number;
+  rounds_completed: number;
+  strengths: string[];
+  improvements: string[];
+  final_tip: string;
 }
 
-// ── Hooks ─────────────────────────────────────────────────────────────────────
+/** Timeout padrão de uma requisição. Endpoints de IA são lentos, daí o valor alto. */
+const REQUEST_TIMEOUT_MS = 60_000;
 
-export function useAnalyze() {
+/** Erro de requisição com o status HTTP, quando disponível, para decisões de retry. */
+export class ApiError extends Error {
+  status?: number;
+  constructor(message: string, status?: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
+/** Falhas que merecem uma nova tentativa: timeout/rede ou erro 5xx do servidor. */
+function isRetryable(error: unknown): boolean {
+  if (error instanceof ApiError) {
+    return error.status === undefined || error.status >= 500;
+  }
+  // Erros sem status (abort por timeout, rede offline) também são retryáveis.
+  return error instanceof Error;
+}
+
+/**
+ * Só repetimos requisições idempotentes (GET). Repetir POST/PUT poderia
+ * duplicar efeitos colaterais (ex: criar duas análises).
+ */
+function isIdempotent(init?: RequestInit): boolean {
+  const method = (init?.method ?? "GET").toUpperCase();
+  return method === "GET" || method === "HEAD";
+}
+
+async function fetchOnce<T>(url: string, init?: RequestInit): Promise<T> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { ...init, signal: controller.signal });
+    if (!res.ok) {
+      const err = await res
+        .json()
+        .catch(() => ({ detail: "Erro desconhecido." }));
+      throw new ApiError(
+        (err as { detail?: string }).detail ?? "Erro na requisição.",
+        res.status,
+      );
+    }
+    return res.json() as Promise<T>;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new ApiError("Tempo de requisição esgotado. Tente novamente.");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/**
+ * Cliente HTTP central. Única fonte de retry da aplicação: 1 nova tentativa
+ * automática em timeout ou erro 5xx. As queries do React Query usam `retry: false`
+ * para não duplicar tentativas.
+ */
+async function apiRequest<T>(url: string, init?: RequestInit): Promise<T> {
+  try {
+    return await fetchOnce<T>(url, init);
+  } catch (error) {
+    if (isIdempotent(init) && isRetryable(error)) {
+      return fetchOnce<T>(url, init);
+    }
+    throw error;
+  }
+}
+
+export function useCreateAnalysis() {
+  const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (form: FormData) =>
-      apiRequest<AnalyzeResponse>(`${API}/analyze/`, { method: "POST", body: form }),
+    mutationFn: async (form: FormData): Promise<AnalysisResult> => {
+      const { analysis_id } = await apiRequest<AnalysisCreateResponse>(
+        `${API}/analysis`,
+        { method: "POST", body: form },
+      );
+      const summary = await apiRequest<AnalyzeResponse>(
+        `${API}/analysis/${encodeURIComponent(analysis_id)}/summary`,
+      );
+      return { analysisId: analysis_id, ...summary };
+    },
+    onSuccess: ({ analysisId }) => {
+      // Gera/cacheia as recomendações logo após o match — página fica instantânea.
+      // Non-blocking: a página ainda funciona standalone se o prefetch falhar.
+      void queryClient.prefetchQuery({
+        queryKey: ["analysis-code-challenges", analysisId],
+        queryFn: () =>
+          apiRequest<LeetCodeProblem[]>(
+            `${API}/analysis/${encodeURIComponent(analysisId)}/code-challenges`,
+          ),
+      });
+    },
   });
 }
 
-export function useGenerateRoadmap() {
+export function useAnalysis(analysisId: string) {
+  return useQuery({
+    queryKey: ["analysis", analysisId],
+    queryFn: () =>
+      apiRequest<AnalysisDetailResponse>(
+        `${API}/analysis/${encodeURIComponent(analysisId)}`,
+      ),
+    enabled: !!analysisId,
+  });
+}
+
+export function useAnalysisRoadmap(analysisId: string) {
+  return useQuery({
+    queryKey: ["analysis-roadmap", analysisId],
+    queryFn: () =>
+      apiRequest<RoadmapTask[]>(
+        `${API}/analysis/${encodeURIComponent(analysisId)}/roadmap`,
+      ),
+    enabled: !!analysisId,
+    retry: false,
+    staleTime: Infinity,
+  });
+}
+
+export function useAnalysisCodeChallenges(analysisId: string) {
+  return useQuery({
+    queryKey: ["analysis-code-challenges", analysisId],
+    queryFn: () =>
+      apiRequest<LeetCodeProblem[]>(
+        `${API}/analysis/${encodeURIComponent(analysisId)}/code-challenges`,
+      ),
+    enabled: !!analysisId,
+    retry: false,
+    staleTime: Infinity,
+  });
+}
+
+export function useAnalysisPitch(analysisId: string) {
+  return useQuery({
+    queryKey: ["analysis-pitch", analysisId],
+    queryFn: () =>
+      apiRequest<PitchCard[]>(
+        `${API}/analysis/${encodeURIComponent(analysisId)}/pitch`,
+      ),
+    enabled: !!analysisId,
+    retry: false,
+    staleTime: Infinity,
+  });
+}
+
+export function useStrategicQuestions(analysisId: string) {
+  return useQuery({
+    queryKey: ["analysis-strategic-questions", analysisId],
+    queryFn: () =>
+      apiRequest<StrategicQuestion[]>(
+        `${API}/analysis/${encodeURIComponent(analysisId)}/strategic-questions`,
+      ),
+    enabled: !!analysisId,
+    retry: false,
+    staleTime: Infinity,
+  });
+}
+
+export function useRegenerateStrategicQuestions(analysisId: string) {
+  const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { gaps: Gap[]; job_title: string }) =>
-      apiRequest<RoadmapTask[]>(`${API}/roadmap`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      }),
+    mutationFn: () =>
+      apiRequest<StrategicQuestion[]>(
+        `${API}/analysis/${encodeURIComponent(analysisId)}/strategic-questions?refresh=true`,
+      ),
+    onSuccess: (data) => {
+      queryClient.setQueryData(
+        ["analysis-strategic-questions", analysisId],
+        data,
+      );
+    },
+  });
+}
+
+export function useAnalysisInterviewQuestions(analysisId: string) {
+  return useQuery({
+    queryKey: ["analysis-interview-questions", analysisId],
+    queryFn: () =>
+      apiRequest<{ questions: string[] }>(
+        `${API}/analysis/${encodeURIComponent(analysisId)}/interview-questions`,
+      ),
+    enabled: !!analysisId,
+    retry: false,
+    staleTime: Infinity,
+  });
+}
+
+export function useEvaluateInterviewAnswer(analysisId: string) {
+  return useMutation({
+    mutationFn: (body: {
+      question: string;
+      transcript: string;
+      gaps: string[];
+      round: number;
+    }) =>
+      apiRequest<InterviewEvaluateResponse>(
+        `${API}/analysis/${encodeURIComponent(analysisId)}/evaluate-interview-answer`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+      ),
+  });
+}
+
+/**
+ * Busca o resumo final consolidado das rodadas da entrevista. Disparado sob
+ * demanda (enabled) ao término da simulação — o backend gera sem cache.
+ */
+export function useInterviewSummary(analysisId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["interview-summary", analysisId],
+    queryFn: () =>
+      apiRequest<InterviewSummaryResponse>(
+        `${API}/analysis/${analysisId}/interview-summary`
+      ),
+    enabled: !!analysisId && enabled,
+    retry: false,
+    staleTime: Infinity,
   });
 }
 
@@ -105,69 +331,42 @@ export function useContext(gapId: string) {
   });
 }
 
-export function useLeetCodeProblems(stack: string, seniority: string, gaps: string) {
-  return useQuery({
-    queryKey: ["leetcode", stack, seniority, gaps],
-    queryFn: () => {
-      const params = new URLSearchParams({ stack, seniority, gaps });
-      return apiRequest<LeetCodeProblem[]>(`${API}/leetcode/?${params}`);
+export function useInterviewTTS() {
+  return useMutation({
+    mutationFn: async (body: {
+      question_text: string;
+      voice?: "alloy" | "nova";
+    }): Promise<ArrayBuffer> => {
+      const res = await fetch(`${API}/interview/tts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ voice: "alloy", ...body }),
+      });
+      if (!res.ok || !res.body) {
+        const err = await res
+          .json()
+          .catch(() => ({ detail: "Falha ao gerar o áudio." }));
+        throw new Error((err as { detail: string }).detail ?? "Falha no TTS.");
+      }
+
+      // Consome o ReadableStream chunk a chunk e remonta num único ArrayBuffer,
+      // pronto para AudioContext.decodeAudioData().
+      const reader = res.body.getReader();
+      const chunks: Uint8Array[] = [];
+      let total = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        total += value.length;
+      }
+      const merged = new Uint8Array(total);
+      let offset = 0;
+      for (const chunk of chunks) {
+        merged.set(chunk, offset);
+        offset += chunk.length;
+      }
+      return merged.buffer;
     },
-    staleTime: Infinity,
-    enabled: !!stack && !!gaps,
-  });
-}
-
-export function useEvaluateSolution() {
-  return useMutation({
-    mutationFn: (body: {
-      slug: string;
-      title: string;
-      description: string;
-      solution: string;
-      language: string;
-    }) =>
-      apiRequest<LeetCodeEvaluateResponse>(`${API}/leetcode/evaluate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      }),
-  });
-}
-
-export function useGeneratePitch() {
-  return useMutation({
-    mutationFn: (body: { candidate_json: object; job_json: object }) =>
-      apiRequest<PitchCard[]>(`${API}/pitch/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      }),
-  });
-}
-
-export function useStartInterview() {
-  return useMutation({
-    mutationFn: (body: { gaps: string[]; session_id: string }) =>
-      apiRequest<{ questions: string[] }>(`${API}/interview/start`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      }),
-  });
-}
-
-export function useEvaluateAnswer() {
-  return useMutation({
-    mutationFn: (body: {
-      question: string;
-      transcript: string;
-      gaps: string[];
-      round: number;
-    }) =>
-      apiRequest<InterviewEvaluateResponse>(`${API}/interview/evaluate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      }),
   });
 }

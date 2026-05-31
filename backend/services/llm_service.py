@@ -1,34 +1,45 @@
 import json
+import logging
+from collections import Counter
 
 from fastapi import HTTPException
-from openai import AsyncOpenAI, OpenAIError
+from openai import APITimeoutError, AsyncOpenAI, OpenAIError
 
 from core.config import settings
 from models.schemas import (
     AnalyzeResponse,
     ContextResponse,
+    Gap,
     InterviewEvaluateResponse,
+    InterviewRound,
     InterviewStartResponse,
-    LeetCodeEvaluateResponse,
-    LeetCodeProblem,
+    InterviewSummaryResponse,
     PitchCard,
     RoadmapTask,
+    StrategicQuestion,
 )
 from services.prompts import (
     ANALYZE_SYSTEM_PROMPT,
     CONTEXT_SYSTEM_PROMPT,
     INTERVIEW_EVAL_SYSTEM_PROMPT,
     INTERVIEW_QUESTIONS_SYSTEM_PROMPT,
-    LEETCODE_EVAL_SYSTEM_PROMPT,
+    INTERVIEW_SUMMARY_SYSTEM_PROMPT,
     LEETCODE_SYSTEM_PROMPT,
     PITCH_SYSTEM_PROMPT,
     ROADMAP_SYSTEM_PROMPT,
+    STRATEGIC_QUESTIONS_SYSTEM_PROMPT,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class LLMService:
     def __init__(self) -> None:
-        self.client = AsyncOpenAI(api_key=settings.openai_api_key)
+        # timeout (httpx) no client cobre TODAS as chamadas deste serviço.
+        self.client = AsyncOpenAI(
+            api_key=settings.openai_api_key,
+            timeout=settings.llm_timeout_seconds,
+        )
         self.model = "gpt-4o-mini"
 
     async def _chat_json(self, system: str, user: str) -> dict:
@@ -40,7 +51,6 @@ class LLMService:
                     {"role": "system", "content": system},
                     {"role": "user", "content": user},
                 ],
-                timeout=30,
             )
             choice = response.choices[0]
 
@@ -54,10 +64,25 @@ class LLMService:
                 )
 
             return json.loads(choice.message.content)
+        except APITimeoutError:
+            # Traceback logado para observabilidade (capturado pelo Sentry, se ativo).
+            logger.exception("Timeout na chamada à OpenAI")
+            raise HTTPException(
+                status_code=503,
+                detail="O serviço de IA demorou para responder. Tente novamente.",
+            )
         except OpenAIError:
-            raise HTTPException(status_code=503, detail="Serviço de IA indisponível. Tente novamente.")
+            logger.exception("Erro na chamada à OpenAI")
+            raise HTTPException(
+                status_code=503,
+                detail="Serviço de IA indisponível. Tente novamente.",
+            )
         except json.JSONDecodeError:
-            raise HTTPException(status_code=502, detail="Resposta inválida do serviço de IA.")
+            logger.exception("Resposta da OpenAI não é JSON válido")
+            raise HTTPException(
+                status_code=502,
+                detail="Resposta inválida do serviço de IA.",
+            )
 
     async def analyze(self, candidate_text: str, job_text: str) -> AnalyzeResponse:
         data = await self._chat_json(
@@ -66,15 +91,68 @@ class LLMService:
         )
         return AnalyzeResponse(**data)
 
-    async def generate_roadmap(self, gaps_json: str, job_title: str) -> list[RoadmapTask]:
+    async def summarize_analysis(
+        self,
+        resume_text: str,
+        job_title: str,
+        job_description: str,
+    ) -> AnalyzeResponse:
+        data = await self._chat_json(
+            ANALYZE_SYSTEM_PROMPT,
+            "\n\n".join([
+                f"<job_title>\n{job_title}\n</job_title>",
+                f"<job_description>\n{job_description}\n</job_description>",
+                f"<user_resume>\n{resume_text}\n</user_resume>",
+            ]),
+        )
+        return AnalyzeResponse(**data)
+
+    def _validate_roadmap(self, tasks: list[RoadmapTask], gaps: list[Gap]) -> None:
+        valid_categories = {"conceito", "pratica", "revisao"}
+        valid_gap_ids = {g.id for g in gaps}
+
+        tasks_per_day: Counter[int] = Counter(t.day for t in tasks)
+        for day, count in tasks_per_day.items():
+            if count > 2:
+                logger.warning("Roadmap inválido: dia %d tem %d tarefas", day, count)
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Roadmap inválido: dia {day} tem {count} tarefas (máximo 2).",
+                )
+
+        critical_ids = {g.id for g in gaps if g.level == "critical"}
+        covered_ids = {t.gap_id for t in tasks}
+        missing = critical_ids - covered_ids
+        if missing:
+            logger.warning("Roadmap inválido: gaps críticos ausentes: %s", missing)
+            raise HTTPException(
+                status_code=502,
+                detail="Roadmap inválido: nem todos os gaps críticos foram cobertos.",
+            )
+
+        for t in tasks:
+            if t.category not in valid_categories:
+                logger.warning("Roadmap inválido: categoria '%s'", t.category)
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Roadmap inválido: categoria '{t.category}' não é permitida.",
+                )
+            if t.gap_id not in valid_gap_ids:
+                logger.warning("Roadmap inválido: gap_id '%s' não corresponde a nenhum gap", t.gap_id)
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Roadmap inválido: gap_id '{t.gap_id}' não corresponde a nenhum gap de entrada.",
+                )
+
+    async def generate_roadmap(self, gaps: list[Gap], job_title: str) -> list[RoadmapTask]:
+        gaps_json = json.dumps([g.model_dump() for g in gaps], ensure_ascii=False)
         data = await self._chat_json(
             ROADMAP_SYSTEM_PROMPT,
             f"Job title: {job_title}\n\nGaps:\n{gaps_json}",
         )
-        # O prompt garante o envelope {"tasks": [...]}; .get com [] evita KeyError
-        # se o modelo, em casos raros, omitir a chave.
-        tasks = data.get("tasks", [])
-        return [RoadmapTask(**t) for t in tasks]
+        tasks = [RoadmapTask(**t) for t in data.get("tasks", [])]
+        self._validate_roadmap(tasks, gaps)
+        return tasks
 
     async def get_context(self, skill: str) -> ContextResponse:
         data = await self._chat_json(
@@ -83,21 +161,16 @@ class LLMService:
         )
         return ContextResponse(**data)
 
-    async def get_leetcode_problems(self, stack: str, seniority: str, gaps: str) -> list[LeetCodeProblem]:
+    async def get_leetcode_problems(self, catalog: list[dict], gaps: str) -> list[dict]:
+        """Pede à LLM que escolha slugs do catálogo. Retorna lista bruta de
+        {slug, reason}; validação e montagem canônica ficam no endpoint (acesso ao DB)."""
+        catalog_json = json.dumps(catalog, ensure_ascii=False)
         data = await self._chat_json(
             LEETCODE_SYSTEM_PROMPT,
-            f"Stack: {stack}\nSeniority: {seniority}\nGaps: {gaps}",
+            f"Catálogo disponível:\n{catalog_json}\n\nGaps do candidato: {gaps}",
         )
-        # Chave "problems" agora é explícita no prompt — contrato determinista.
-        problems = data.get("problems", [])
-        return [LeetCodeProblem(**p) for p in problems]
-
-    async def evaluate_leetcode(self, slug: str, title: str, description: str, solution: str, language: str) -> LeetCodeEvaluateResponse:
-        data = await self._chat_json(
-            LEETCODE_EVAL_SYSTEM_PROMPT,
-            f"Problem: {title} ({slug})\nDescription:\n{description}\nLanguage: {language}\nSolution:\n{solution}",
-        )
-        return LeetCodeEvaluateResponse(**data)
+        # Chave "problems" explícita no prompt — contrato determinista.
+        return data.get("problems", [])
 
     async def generate_pitch(self, candidate_json: dict, job_json: dict) -> list[PitchCard]:
         # json já está importado no topo do módulo — import local era desnecessário.
@@ -109,6 +182,24 @@ class LLMService:
         cards = data.get("cards", [])
         return [PitchCard(**c) for c in cards]
 
+    async def generate_strategic_questions(
+        self,
+        job_title: str,
+        job_description: str,
+        company_name: str,
+    ) -> list[StrategicQuestion]:
+        data = await self._chat_json(
+            STRATEGIC_QUESTIONS_SYSTEM_PROMPT,
+            "\n\n".join([
+                f"<company_name>\n{company_name}\n</company_name>",
+                f"<job_title>\n{job_title}\n</job_title>",
+                f"<job_description>\n{job_description}\n</job_description>",
+            ]),
+        )
+        # Chave "questions" é explícita no prompt — contrato determinista.
+        questions = data.get("questions", [])
+        return [StrategicQuestion(**q) for q in questions]
+
     async def generate_interview_questions(self, gaps: list[str], session_id: str) -> InterviewStartResponse:
         data = await self._chat_json(
             INTERVIEW_QUESTIONS_SYSTEM_PROMPT,
@@ -117,8 +208,20 @@ class LLMService:
         return InterviewStartResponse(**data)
 
     async def evaluate_interview(self, question: str, transcript: str, gaps: list[str], round: int) -> InterviewEvaluateResponse:
+        # score_1_5 é derivado das 3 dimensões no próprio schema (ver
+        # InterviewEvaluateResponse._derive_score) — não confiamos na média do LLM.
         data = await self._chat_json(
             INTERVIEW_EVAL_SYSTEM_PROMPT,
             f"Round: {round}\nGaps: {', '.join(gaps)}\nQuestion: {question}\nAnswer: {transcript}",
         )
         return InterviewEvaluateResponse(**data)
+
+    async def summarize_interview(self, rounds: list[InterviewRound]) -> InterviewSummaryResponse:
+        history = json.dumps([r.model_dump() for r in rounds], ensure_ascii=False)
+        data = await self._chat_json(
+            INTERVIEW_SUMMARY_SYSTEM_PROMPT,
+            f"Histórico das rodadas:\n{history}",
+        )
+        # rounds_completed é determinístico: vem do backend, não do LLM.
+        data["rounds_completed"] = len(rounds)
+        return InterviewSummaryResponse(**data)
