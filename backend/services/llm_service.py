@@ -3,7 +3,7 @@ import logging
 from collections import Counter
 
 from fastapi import HTTPException
-from openai import AsyncOpenAI, OpenAIError
+from openai import APITimeoutError, AsyncOpenAI, OpenAIError
 
 from core.config import settings
 from models.schemas import (
@@ -35,7 +35,11 @@ logger = logging.getLogger(__name__)
 
 class LLMService:
     def __init__(self) -> None:
-        self.client = AsyncOpenAI(api_key=settings.openai_api_key)
+        # timeout (httpx) no client cobre TODAS as chamadas deste serviço.
+        self.client = AsyncOpenAI(
+            api_key=settings.openai_api_key,
+            timeout=settings.llm_timeout_seconds,
+        )
         self.model = "gpt-4o-mini"
 
     async def _chat_json(self, system: str, user: str) -> dict:
@@ -47,7 +51,6 @@ class LLMService:
                     {"role": "system", "content": system},
                     {"role": "user", "content": user},
                 ],
-                timeout=30,
             )
             choice = response.choices[0]
 
@@ -61,10 +64,25 @@ class LLMService:
                 )
 
             return json.loads(choice.message.content)
+        except APITimeoutError:
+            # Traceback logado para observabilidade (capturado pelo Sentry, se ativo).
+            logger.exception("Timeout na chamada à OpenAI")
+            raise HTTPException(
+                status_code=503,
+                detail="O serviço de IA demorou para responder. Tente novamente.",
+            )
         except OpenAIError:
-            raise HTTPException(status_code=503, detail="Serviço de IA indisponível. Tente novamente.")
+            logger.exception("Erro na chamada à OpenAI")
+            raise HTTPException(
+                status_code=503,
+                detail="Serviço de IA indisponível. Tente novamente.",
+            )
         except json.JSONDecodeError:
-            raise HTTPException(status_code=502, detail="Resposta inválida do serviço de IA.")
+            logger.exception("Resposta da OpenAI não é JSON válido")
+            raise HTTPException(
+                status_code=502,
+                detail="Resposta inválida do serviço de IA.",
+            )
 
     async def analyze(self, candidate_text: str, job_text: str) -> AnalyzeResponse:
         data = await self._chat_json(

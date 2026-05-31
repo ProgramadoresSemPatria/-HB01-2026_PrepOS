@@ -1,5 +1,8 @@
 import { Fragment } from "react";
+import { useNavigate } from "react-router-dom";
 
+import { EmptyState } from "../../components/EmptyState";
+import { CodeChallengeSkeleton } from "../../components/Skeletons";
 import { useAnalysisCodeChallenges, type LeetCodeProblem } from "../../lib/api";
 import { useSession } from "../../store/session";
 
@@ -59,11 +62,13 @@ function ReasonCell({ problem }: { problem: LeetCodeProblem }) {
 }
 
 export function CodeChallengePage() {
+  const navigate = useNavigate();
   const analysisId = useSession((s) => s.analysisId);
   const {
     data: problems,
     isLoading,
     error,
+    refetch,
   } = useAnalysisCodeChallenges(analysisId);
 
   return (
@@ -77,18 +82,21 @@ export function CodeChallengePage() {
       </header>
 
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center py-20 gap-3">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#3ecf8e]"></div>
-          <p className="text-sm text-gray-500">Carregando recomendações...</p>
-        </div>
+        <CodeChallengeSkeleton />
       ) : error instanceof Error ? (
-        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-5 text-sm text-red-200">
-          {error.message}
-        </div>
+        <EmptyState
+          title="Não foi possível carregar os desafios"
+          description={error.message}
+          ctaLabel="Tentar novamente"
+          onCta={() => refetch()}
+        />
       ) : !problems || problems.length === 0 ? (
-        <div className="flex flex-col items-center justify-center text-[#9a9a9a] bg-[#202020] rounded-2xl border border-gray-800 border-dashed p-10 text-center">
-          <p>Nenhuma recomendação disponível ainda.</p>
-        </div>
+        <EmptyState
+          title="Nenhuma recomendação disponível"
+          description="Ainda não há desafios recomendados para os seus gaps. Refaça a análise para gerá-los."
+          ctaLabel="Voltar para análise"
+          onCta={() => navigate("/summary")}
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
           <div className="hidden md:block text-xs font-semibold text-gray-500 uppercase tracking-wider pb-1">

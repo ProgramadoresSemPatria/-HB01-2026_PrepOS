@@ -12,13 +12,6 @@ import { RecruiterQuestions } from '../../components/RecruiterQuestions';
 
 const TOTAL_ROUNDS = 3;
 
-declare global {
-  interface Window {
-    SpeechRecognition: any;
-    webkitSpeechRecognition: any;
-  }
-}
-
 const MOCK_QUESTIONS = [
   "Conte-me sobre um momento em que você teve que lidar com um prazo muito apertado e como você gerenciou a situação.",
   "Descreva uma situação onde você discordou de um colega sobre uma decisão técnica. Como vocês resolveram isso?",

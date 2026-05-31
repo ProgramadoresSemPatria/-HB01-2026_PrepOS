@@ -11,6 +11,10 @@ class Settings(BaseSettings):
     max_code_bytes: int = 10000
     code_runner_timeout_seconds: float = 5.0
     max_runner_output_bytes: int = 20000
+    # Timeout (segundos, httpx) aplicado a todas as chamadas LLM/TTS da OpenAI.
+    llm_timeout_seconds: float = 30.0
+    # Observabilidade — opcional no hackathon. Vazio = Sentry desativado.
+    sentry_dsn: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

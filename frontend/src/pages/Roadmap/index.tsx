@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CalendarPlus, Check } from "lucide-react";
 
+import { EmptyState } from "../../components/EmptyState";
 import { RoadmapDaysView } from "../../components/RoadmapDaysView";
 import { RoadmapProgressBar } from "../../components/RoadmapProgressBar";
+import { RoadmapSkeleton } from "../../components/Skeletons";
 import { useAnalysisRoadmap } from "../../lib/api";
 import { buildRoadmapIcs, buildRoadmapPlainText } from "../../lib/ics";
 import {
@@ -92,6 +94,13 @@ export function RoadmapPage() {
   const showError =
     !isLoading && roadmap.length === 0 && !!fetchError && !!analysisId;
   const showEmpty = !analysisId;
+  // Fetch concluído com sucesso, mas sem tarefas: estado "sem dados".
+  const showNoData =
+    !isLoading &&
+    !showError &&
+    !!analysisId &&
+    !isFetching &&
+    roadmap.length === 0;
 
   const showChallengeCta = completedDays >= CHALLENGE_CTA_THRESHOLD;
   const isFullyComplete = completedDays === TOTAL_DAYS;
@@ -105,38 +114,33 @@ export function RoadmapPage() {
         </p>
       </header>
 
-      {isLoading && (
-        <div className="bg-[#202020] rounded-xl border border-gray-700 p-8 text-center">
-          <p className="text-gray-400">Gerando seu roadmap...</p>
-        </div>
-      )}
+      {isLoading && <RoadmapSkeleton />}
 
       {showError && (
-        <div className="bg-red-500/10 rounded-xl border border-red-500/20 p-6 flex flex-col gap-3">
-          <p className="text-red-400 text-sm">
-            {(fetchError as Error).message}
-          </p>
-          <button
-            onClick={() => refetch()}
-            className="self-start bg-[#3ecf8e] text-[#171717] text-sm font-semibold px-4 py-2 rounded-lg hover:bg-[#3ecf8e]/90 transition"
-          >
-            Tentar novamente
-          </button>
-        </div>
+        <EmptyState
+          title="Não foi possível gerar o roadmap"
+          description={(fetchError as Error).message}
+          ctaLabel="Tentar novamente"
+          onCta={() => refetch()}
+        />
       )}
 
       {showEmpty && (
-        <div className="bg-[#202020] rounded-xl border border-gray-700 p-6 flex flex-col gap-3">
-          <p className="text-gray-300 text-sm">
-            Você ainda não tem uma análise. Faça uma nova análise primeiro.
-          </p>
-          <button
-            onClick={() => navigate("/new")}
-            className="self-start bg-[#3ecf8e] text-[#171717] text-sm font-semibold px-4 py-2 rounded-lg hover:bg-[#3ecf8e]/90 transition"
-          >
-            Nova análise
-          </button>
-        </div>
+        <EmptyState
+          title="Você ainda não tem uma análise"
+          description="Faça uma nova análise primeiro para gerar o seu roadmap de estudo."
+          ctaLabel="Nova análise"
+          onCta={() => navigate("/new")}
+        />
+      )}
+
+      {showNoData && (
+        <EmptyState
+          title="Nenhum roadmap disponível"
+          description="A análise não gerou tarefas de estudo. Refaça a análise para tentar novamente."
+          ctaLabel="Voltar para análise"
+          onCta={() => navigate("/summary")}
+        />
       )}
 
       {!isLoading && roadmap.length > 0 && (

@@ -57,6 +57,7 @@ export function NewAnalysisPage() {
         "Análise simulada (modo dev). Perfil sólido em desenvolvimento, com lacunas em arquitetura e infraestrutura para o nível alvo.",
       jobTitle: jobTitle || "Software Engineer L4",
       jobDescription: jobText || "Vaga simulada para navegação local.",
+      companyName: companyName || "Empresa Demo",
       fileName: fileName || "curriculo-demo.pdf",
     });
     navigate("/summary", { state: { fromUpload: true } });
