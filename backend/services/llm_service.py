@@ -11,7 +11,9 @@ from models.schemas import (
     ContextResponse,
     Gap,
     InterviewEvaluateResponse,
+    InterviewRound,
     InterviewStartResponse,
+    InterviewSummaryResponse,
     PitchCard,
     RoadmapTask,
     StrategicQuestion,
@@ -21,6 +23,7 @@ from services.prompts import (
     CONTEXT_SYSTEM_PROMPT,
     INTERVIEW_EVAL_SYSTEM_PROMPT,
     INTERVIEW_QUESTIONS_SYSTEM_PROMPT,
+    INTERVIEW_SUMMARY_SYSTEM_PROMPT,
     LEETCODE_SYSTEM_PROMPT,
     PITCH_SYSTEM_PROMPT,
     ROADMAP_SYSTEM_PROMPT,
@@ -187,8 +190,20 @@ class LLMService:
         return InterviewStartResponse(**data)
 
     async def evaluate_interview(self, question: str, transcript: str, gaps: list[str], round: int) -> InterviewEvaluateResponse:
+        # score_1_5 é derivado das 3 dimensões no próprio schema (ver
+        # InterviewEvaluateResponse._derive_score) — não confiamos na média do LLM.
         data = await self._chat_json(
             INTERVIEW_EVAL_SYSTEM_PROMPT,
             f"Round: {round}\nGaps: {', '.join(gaps)}\nQuestion: {question}\nAnswer: {transcript}",
         )
         return InterviewEvaluateResponse(**data)
+
+    async def summarize_interview(self, rounds: list[InterviewRound]) -> InterviewSummaryResponse:
+        history = json.dumps([r.model_dump() for r in rounds], ensure_ascii=False)
+        data = await self._chat_json(
+            INTERVIEW_SUMMARY_SYSTEM_PROMPT,
+            f"Histórico das rodadas:\n{history}",
+        )
+        # rounds_completed é determinístico: vem do backend, não do LLM.
+        data["rounds_completed"] = len(rounds)
+        return InterviewSummaryResponse(**data)

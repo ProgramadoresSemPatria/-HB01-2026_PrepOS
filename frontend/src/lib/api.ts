@@ -78,10 +78,21 @@ export interface StrategicQuestion {
 }
 
 export interface InterviewEvaluateResponse {
+  clarity_1_5: number;
+  star_1_5: number;
+  technical_1_5: number;
   score_1_5: number;
   strengths: string[];
   improvements: string[];
   tip: string;
+}
+
+export interface InterviewSummaryResponse {
+  overall_score_1_5: number;
+  rounds_completed: number;
+  strengths: string[];
+  improvements: string[];
+  final_tip: string;
 }
 
 async function apiRequest<T>(url: string, init?: RequestInit): Promise<T> {
@@ -218,6 +229,7 @@ export function useEvaluateInterviewAnswer(analysisId: string) {
       question: string;
       transcript: string;
       gaps: string[];
+      round: number;
     }) =>
       apiRequest<InterviewEvaluateResponse>(
         `${API}/analysis/${encodeURIComponent(analysisId)}/evaluate-interview-answer`,
@@ -230,11 +242,68 @@ export function useEvaluateInterviewAnswer(analysisId: string) {
   });
 }
 
+/**
+ * Busca o resumo final consolidado das rodadas da entrevista. Disparado sob
+ * demanda (enabled) ao término da simulação — o backend gera sem cache.
+ */
+export function useInterviewSummary(analysisId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["interview-summary", analysisId],
+    queryFn: () =>
+      apiRequest<InterviewSummaryResponse>(
+        `${API}/analysis/${analysisId}/interview-summary`
+      ),
+    enabled: !!analysisId && enabled,
+    retry: false,
+    staleTime: Infinity,
+  });
+}
+
 export function useContext(gapId: string) {
   return useQuery({
     queryKey: ["context", gapId],
     queryFn: () => apiRequest<ContextResponse>(`${API}/context/${encodeURIComponent(gapId)}`),
     staleTime: Infinity,
     enabled: !!gapId,
+  });
+}
+
+export function useInterviewTTS() {
+  return useMutation({
+    mutationFn: async (body: {
+      question_text: string;
+      voice?: "alloy" | "nova";
+    }): Promise<ArrayBuffer> => {
+      const res = await fetch(`${API}/interview/tts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ voice: "alloy", ...body }),
+      });
+      if (!res.ok || !res.body) {
+        const err = await res
+          .json()
+          .catch(() => ({ detail: "Falha ao gerar o áudio." }));
+        throw new Error((err as { detail: string }).detail ?? "Falha no TTS.");
+      }
+
+      // Consome o ReadableStream chunk a chunk e remonta num único ArrayBuffer,
+      // pronto para AudioContext.decodeAudioData().
+      const reader = res.body.getReader();
+      const chunks: Uint8Array[] = [];
+      let total = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        total += value.length;
+      }
+      const merged = new Uint8Array(total);
+      let offset = 0;
+      for (const chunk of chunks) {
+        merged.set(chunk, offset);
+        offset += chunk.length;
+      }
+      return merged.buffer;
+    },
   });
 }

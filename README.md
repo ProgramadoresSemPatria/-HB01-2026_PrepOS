@@ -1,10 +1,10 @@
-# PrepOS — Plataforma de Preparação para Entrevistas Técnicas
+# CareerSync — Plataforma de Preparação para Entrevistas Técnicas
 
-PrepOS é uma plataforma inteligente que ajuda desenvolvedores a se prepararem para entrevistas técnicas de forma personalizada, do upload do currículo até a simulação de entrevista por áudio.
+CareerSync é uma plataforma inteligente que ajuda desenvolvedores a se prepararem para entrevistas técnicas de forma personalizada, do upload do currículo até a simulação de entrevista por áudio.
 
 ## Problema Resolvido
 
-Candidatos chegam a entrevistas técnicas sem saber exatamente onde estão seus gaps em relação à vaga. O PrepOS analisa o currículo e a descrição da vaga com IA, gera um match score real, monta um plano de estudo de 7 dias, recomenda problemas LeetCode relevantes, gera pitches STAR a partir das experiências do candidato e simula uma entrevista completa com feedback em tempo real.
+Candidatos chegam a entrevistas técnicas sem saber exatamente onde estão seus gaps em relação à vaga. O CareerSync analisa o currículo e a descrição da vaga com IA, gera um match score real, monta um plano de estudo de 7 dias, recomenda problemas LeetCode relevantes, gera pitches STAR a partir das experiências do candidato e simula uma entrevista completa com feedback em tempo real.
 
 ## Stack Utilizada
 
