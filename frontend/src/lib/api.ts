@@ -95,13 +95,76 @@ export interface InterviewSummaryResponse {
   final_tip: string;
 }
 
-async function apiRequest<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, init);
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: "Erro desconhecido." }));
-    throw new Error((err as { detail: string }).detail ?? "Erro na requisição.");
+/** Timeout padrão de uma requisição. Endpoints de IA são lentos, daí o valor alto. */
+const REQUEST_TIMEOUT_MS = 60_000;
+
+/** Erro de requisição com o status HTTP, quando disponível, para decisões de retry. */
+export class ApiError extends Error {
+  status?: number;
+  constructor(message: string, status?: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
   }
-  return res.json() as Promise<T>;
+}
+
+/** Falhas que merecem uma nova tentativa: timeout/rede ou erro 5xx do servidor. */
+function isRetryable(error: unknown): boolean {
+  if (error instanceof ApiError) {
+    return error.status === undefined || error.status >= 500;
+  }
+  // Erros sem status (abort por timeout, rede offline) também são retryáveis.
+  return error instanceof Error;
+}
+
+/**
+ * Só repetimos requisições idempotentes (GET). Repetir POST/PUT poderia
+ * duplicar efeitos colaterais (ex: criar duas análises).
+ */
+function isIdempotent(init?: RequestInit): boolean {
+  const method = (init?.method ?? "GET").toUpperCase();
+  return method === "GET" || method === "HEAD";
+}
+
+async function fetchOnce<T>(url: string, init?: RequestInit): Promise<T> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { ...init, signal: controller.signal });
+    if (!res.ok) {
+      const err = await res
+        .json()
+        .catch(() => ({ detail: "Erro desconhecido." }));
+      throw new ApiError(
+        (err as { detail?: string }).detail ?? "Erro na requisição.",
+        res.status,
+      );
+    }
+    return res.json() as Promise<T>;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new ApiError("Tempo de requisição esgotado. Tente novamente.");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/**
+ * Cliente HTTP central. Única fonte de retry da aplicação: 1 nova tentativa
+ * automática em timeout ou erro 5xx. As queries do React Query usam `retry: false`
+ * para não duplicar tentativas.
+ */
+async function apiRequest<T>(url: string, init?: RequestInit): Promise<T> {
+  try {
+    return await fetchOnce<T>(url, init);
+  } catch (error) {
+    if (isIdempotent(init) && isRetryable(error)) {
+      return fetchOnce<T>(url, init);
+    }
+    throw error;
+  }
 }
 
 export function useCreateAnalysis() {

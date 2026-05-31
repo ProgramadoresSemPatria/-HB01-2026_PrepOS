@@ -1,6 +1,9 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ChevronDown, Copy, Check, Link2 } from 'lucide-react';
 
+import { EmptyState } from '../../components/EmptyState';
+import { PitchSkeleton } from '../../components/Skeletons';
 import { useAnalysisPitch, type PitchCard } from '../../lib/api';
 import { useSession } from '../../store/session';
 
@@ -151,12 +154,14 @@ const StarCard = ({ pitch }: { pitch: PitchCard }) => {
 };
 
 export function PitchPage() {
+  const navigate = useNavigate();
   const jobTitle = useSession((s) => s.jobTitle);
   const analysisId = useSession((s) => s.analysisId);
   const {
     data: pitches,
     isLoading: isPending,
     isError,
+    refetch,
   } = useAnalysisPitch(analysisId);
 
   return (
@@ -176,58 +181,48 @@ export function PitchPage() {
         </p>
       </header>
 
-      {isPending && (
-        <div className="flex flex-col items-center justify-center py-20 space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3ecf8e]"></div>
-          <p className="text-gray-400 text-sm animate-pulse">
-            Lapidando suas narrativas com Inteligência Artificial...
-          </p>
-        </div>
-      )}
+      {isPending && <PitchSkeleton />}
 
       {isError && (
-        <div className="bg-red-500/10 border border-red-500/20 p-8 rounded-2xl text-center max-w-2xl mx-auto shadow-lg flex flex-col items-center">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={1.5}
-            stroke="currentColor"
-            className="w-16 h-16 text-red-500 mb-4 opacity-80"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-            />
-          </svg>
-          <h2 className="text-xl font-bold text-red-400 mb-2">Não foi possível gerar os pitches</h2>
-          <p className="text-gray-300 text-sm leading-relaxed mb-6">
-            Ocorreu um erro ao gerar os cartões de pitch STAR. Tente novamente em instantes.
-          </p>
-          <button
-            onClick={() => window.location.reload()}
-            className="bg-[#202020] hover:bg-[#2a2a2a] border border-gray-700 text-white font-medium py-2 px-6 rounded-lg transition-colors"
-          >
-            Tentar Novamente
-          </button>
-        </div>
+        <EmptyState
+          icon={
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+              stroke="currentColor"
+              className="w-12 h-12 text-red-500 opacity-80"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              />
+            </svg>
+          }
+          title="Não foi possível gerar os pitches"
+          description="Ocorreu um erro ao gerar os cartões de pitch STAR. Tente novamente em instantes."
+          ctaLabel="Tentar novamente"
+          onCta={() => refetch()}
+        />
       )}
 
-      {pitches && (
-        <div className="grid gap-6 md:grid-cols-2 items-start">
-          {pitches.map((pitch, idx) => (
-            <StarCard key={idx} pitch={pitch} />
-          ))}
-          {pitches.length === 0 && (
-            <div className="col-span-full bg-[#202020] border border-gray-800 border-dashed rounded-2xl p-12 text-center">
-              <p className="text-gray-400">
-                Nenhuma experiência pôde ser mapeada para o seu currículo.
-              </p>
-            </div>
-          )}
-        </div>
-      )}
+      {pitches &&
+        (pitches.length === 0 ? (
+          <EmptyState
+            title="Nenhum pitch disponível"
+            description="Nenhuma experiência pôde ser mapeada a partir do seu currículo. Refaça a análise para tentar novamente."
+            ctaLabel="Voltar para análise"
+            onCta={() => navigate("/summary")}
+          />
+        ) : (
+          <div className="grid gap-6 md:grid-cols-2 items-start">
+            {pitches.map((pitch, idx) => (
+              <StarCard key={idx} pitch={pitch} />
+            ))}
+          </div>
+        ))}
     </div>
   );
 }
