@@ -21,3 +21,15 @@ class Analysis(SQLModel, table=True):
     interview_questions: dict | None = Field(default=None, sa_column=Column(JSON))
 
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class LeetcodeProblem(SQLModel, table=True):
+    """Catálogo curado de problemas LeetCode — fonte única de verdade dos links."""
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    slug: str = Field(unique=True, index=True)
+    title: str
+    description: str
+    difficulty: str  # Easy | Medium | Hard
+    category: str
+    url: str
