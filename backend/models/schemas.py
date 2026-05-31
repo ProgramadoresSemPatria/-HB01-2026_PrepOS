@@ -33,15 +33,6 @@ class AnalysisDetailResponse(BaseModel):
     resume: ResumeMeta
 
 
-class EvaluateSolutionRequest(BaseModel):
-    analysis_id: str
-    slug: str
-    title: str
-    description: str
-    solution: str
-    language: str
-
-
 class EvaluateInterviewAnswerRequest(BaseModel):
     question: str
     transcript: str
@@ -74,24 +65,9 @@ class LeetCodeProblem(BaseModel):
     title: str
     difficulty: Literal["Easy", "Medium", "Hard"]
     category: str
-    reason: str
-
-
-class LeetCodeEvaluateRequest(BaseModel):
-    slug: str
-    title: str
+    url: str
     description: str
-    solution: str
-    language: str
-
-
-class LeetCodeEvaluateResponse(BaseModel):
-    correct: bool
-    time_complexity: str
-    space_complexity: str
-    strengths: list[str]
-    improvements: list[str]
-    optimal_hint: str
+    reason: str
 
 
 class PitchRequest(BaseModel):
