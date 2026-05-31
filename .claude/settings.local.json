@@ -20,7 +20,14 @@
       "Bash(py --version)",
       "PowerShell(cd C:\\\\Users\\\\Thiago\\\\Desktop\\\\PrepOs\\\\backend; $env:PYTHONUNBUFFERED=1; Start-Process -FilePath \".\\\\.venv\\\\Scripts\\\\python.exe\" -ArgumentList \"-m\",\"uvicorn\",\"main:app\",\"--port\",\"8000\" -RedirectStandardOutput \"uvicorn.out.log\" -RedirectStandardError \"uvicorn.err.log\" -NoNewWindow; Start-Sleep -Seconds 6; Write-Output \"=== OUT ===\"; Get-Content uvicorn.out.log -ErrorAction SilentlyContinue; Write-Output \"=== ERR ===\"; Get-Content uvicorn.err.log -ErrorAction SilentlyContinue)",
       "Bash(./.venv/Scripts/python.exe -c \"import models.schemas, services.prompts, services.llm_service, services.eval_service, routers.analysis, models.db_models; print\\('OK imports'\\)\")",
-      "Bash(./.venv/Scripts/python.exe *)"
+      "Bash(./.venv/Scripts/python.exe *)",
+      "Bash(git commit *)",
+      "Bash(git --no-pager log --oneline -3)",
+      "Bash(git --no-pager stash list)",
+      "Bash(git stash *)",
+      "Bash(git --no-pager stash show -p stash@{0})",
+      "Bash(git --no-pager status --short)",
+      "Bash(git push *)"
     ]
   }
 }
