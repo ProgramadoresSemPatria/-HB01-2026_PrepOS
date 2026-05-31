@@ -12,18 +12,14 @@ from models.schemas import (
     Gap,
     InterviewEvaluateResponse,
     InterviewStartResponse,
-    LeetCodeEvaluateResponse,
-    LeetCodeProblem,
     PitchCard,
     RoadmapTask,
 )
 from services.prompts import (
     ANALYZE_SYSTEM_PROMPT,
-    CHALLENGE_HINT_SYSTEM_PROMPT,
     CONTEXT_SYSTEM_PROMPT,
     INTERVIEW_EVAL_SYSTEM_PROMPT,
     INTERVIEW_QUESTIONS_SYSTEM_PROMPT,
-    LEETCODE_EVAL_SYSTEM_PROMPT,
     LEETCODE_SYSTEM_PROMPT,
     PITCH_SYSTEM_PROMPT,
     ROADMAP_SYSTEM_PROMPT,
@@ -142,37 +138,16 @@ class LLMService:
         )
         return ContextResponse(**data)
 
-    async def get_leetcode_problems(self, stack: str, seniority: str, gaps: str) -> list[LeetCodeProblem]:
+    async def get_leetcode_problems(self, catalog: list[dict], gaps: str) -> list[dict]:
+        """Pede à LLM que escolha slugs do catálogo. Retorna lista bruta de
+        {slug, reason}; validação e montagem canônica ficam no endpoint (acesso ao DB)."""
+        catalog_json = json.dumps(catalog, ensure_ascii=False)
         data = await self._chat_json(
             LEETCODE_SYSTEM_PROMPT,
-            f"Stack: {stack}\nSeniority: {seniority}\nGaps: {gaps}",
+            f"Catálogo disponível:\n{catalog_json}\n\nGaps do candidato: {gaps}",
         )
-        # Chave "problems" agora é explícita no prompt — contrato determinista.
-        problems = data.get("problems", [])
-        return [LeetCodeProblem(**p) for p in problems]
-
-    async def evaluate_leetcode(self, slug: str, title: str, description: str, solution: str, language: str) -> LeetCodeEvaluateResponse:
-        data = await self._chat_json(
-            LEETCODE_EVAL_SYSTEM_PROMPT,
-            f"Problem: {title} ({slug})\nDescription:\n{description}\nLanguage: {language}\nSolution:\n{solution}",
-        )
-        return LeetCodeEvaluateResponse(**data)
-
-    async def generate_challenge_hint(self, challenge: object, code: str) -> str:
-        data = await self._chat_json(
-            CHALLENGE_HINT_SYSTEM_PROMPT,
-            "\n\n".join([
-                f"Title: {challenge.title}",
-                f"Category: {challenge.category}",
-                f"Description:\n{challenge.description}",
-                f"Required signature:\n{challenge.signature}",
-                f"Current code:\n{code}",
-            ]),
-        )
-        hint = data.get("hint")
-        if not isinstance(hint, str) or not hint.strip():
-            raise HTTPException(status_code=502, detail="Resposta inválida do serviço de IA.")
-        return hint
+        # Chave "problems" explícita no prompt — contrato determinista.
+        return data.get("problems", [])
 
     async def generate_pitch(self, candidate_json: dict, job_json: dict) -> list[PitchCard]:
         # json já está importado no topo do módulo — import local era desnecessário.

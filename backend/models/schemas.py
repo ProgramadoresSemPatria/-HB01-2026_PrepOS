@@ -33,15 +33,6 @@ class AnalysisDetailResponse(BaseModel):
     resume: ResumeMeta
 
 
-class EvaluateSolutionRequest(BaseModel):
-    analysis_id: str
-    slug: str
-    title: str
-    description: str
-    solution: str
-    language: str
-
-
 class EvaluateInterviewAnswerRequest(BaseModel):
     question: str
     transcript: str
@@ -74,73 +65,9 @@ class LeetCodeProblem(BaseModel):
     title: str
     difficulty: Literal["Easy", "Medium", "Hard"]
     category: str
-    reason: str
-
-
-class LeetCodeEvaluateRequest(BaseModel):
-    slug: str
-    title: str
+    url: str
     description: str
-    solution: str
-    language: str
-
-
-class LeetCodeEvaluateResponse(BaseModel):
-    correct: bool
-    time_complexity: str
-    space_complexity: str
-    strengths: list[str]
-    improvements: list[str]
-    optimal_hint: str
-
-
-class ChallengeExample(BaseModel):
-    input: dict
-    expected: object
-    explanation: str | None = None
-
-
-class ChallengeSummary(BaseModel):
-    slug: str
-    title: str
-    difficulty: Literal["Easy", "Medium", "Hard"]
-    category: str
     reason: str
-
-
-class ChallengeDetail(ChallengeSummary):
-    description: str
-    function_name: str
-    signature: str
-    examples: list[ChallengeExample]
-    constraints: list[str]
-
-
-class ChallengeSubmitRequest(BaseModel):
-    code: str
-
-
-class ChallengeTestFailure(BaseModel):
-    input: dict
-    expected: object
-    actual: object
-
-
-class ChallengeSubmitResponse(BaseModel):
-    passed: bool
-    status: Literal["passed", "failed", "error", "timeout"]
-    total_tests: int
-    passed_count: int
-    first_failure: ChallengeTestFailure | None = None
-    error: str | None = None
-
-
-class ChallengeHintRequest(BaseModel):
-    code: str
-
-
-class ChallengeHintResponse(BaseModel):
-    hint: str
 
 
 class PitchRequest(BaseModel):
