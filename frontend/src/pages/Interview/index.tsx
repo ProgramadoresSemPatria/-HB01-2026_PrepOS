@@ -8,6 +8,7 @@ import {
   useInterviewTTS,
   type InterviewEvaluateResponse,
 } from '../../lib/api';
+import { RecruiterQuestions } from '../../components/RecruiterQuestions';
 
 const TOTAL_ROUNDS = 3;
 
@@ -91,7 +92,7 @@ export function InterviewPage() {
   const isLastRound = currentQuestionIndex >= questions.length - 1;
   const question = questions[currentQuestionIndex];
   const [evaluation, setEvaluation] = useState<InterviewEvaluateResponse | null>(null);
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   // Resumo final: só dispara quando a simulação termina (isFinished).
   const {
@@ -581,6 +582,8 @@ export function InterviewPage() {
           </div>
         </div>
       )}
+
+      {analysisId && <RecruiterQuestions analysisId={analysisId} />}
     </div>
   );
 }

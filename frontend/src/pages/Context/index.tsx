@@ -52,7 +52,7 @@ export function ContextPage() {
           <section>
             <h2 className="flex items-center text-lg font-bold text-white mb-4">
               <span className="w-8 h-8 rounded bg-blue-500/20 border border-blue-500/30 text-blue-400 flex items-center justify-center mr-3 shrink-0">
-                <BookOpen size={16} />
+                <BookOpen size={16} strokeWidth={2} />
               </span>
               O que é?
             </h2>
@@ -64,7 +64,7 @@ export function ContextPage() {
           <section>
             <h2 className="flex items-center text-lg font-bold text-white mb-4">
               <span className="w-8 h-8 rounded bg-amber-500/20 border border-amber-500/30 text-amber-400 flex items-center justify-center mr-3 shrink-0">
-                <Target size={16} />
+                <Target size={16} strokeWidth={2} />
               </span>
               Por que é Relevante?
             </h2>
@@ -76,7 +76,7 @@ export function ContextPage() {
           <section>
             <h2 className="flex items-center text-lg font-bold text-white mb-4">
               <span className="w-8 h-8 rounded bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 flex items-center justify-center mr-3 shrink-0">
-                <Briefcase size={16} />
+                <Briefcase size={16} strokeWidth={2} />
               </span>
               Como Demonstrar em Entrevistas?
             </h2>

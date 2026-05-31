@@ -84,6 +84,14 @@ class PitchCard(BaseModel):
     result: str
     vaga_connection: str
     relevance: str
+    # Opcional com default para não quebrar pitches já cacheados sem o campo.
+    relevance_level: Literal["alta", "media"] = "media"
+
+
+class StrategicQuestion(BaseModel):
+    question: str
+    type: Literal["cultura", "tecnico", "desafios"]
+    why_strategic: str
 
 
 class InterviewStartRequest(BaseModel):
