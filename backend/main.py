@@ -49,7 +49,10 @@ app = FastAPI(title="Prep AI", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "https://*.vercel.app"],
+    # CORSMiddleware faz match EXATO em allow_origins (sem curinga). Para liberar
+    # todos os subdomínios da Vercel (preview + produção) usamos allow_origin_regex.
+    allow_origins=["http://localhost:5173"],
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

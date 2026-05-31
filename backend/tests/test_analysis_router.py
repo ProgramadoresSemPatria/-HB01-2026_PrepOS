@@ -84,6 +84,7 @@ class AnalysisRouterTest(unittest.TestCase):
             data={
                 "job_title": "Backend Engineer",
                 "job_description": "Build FastAPI services",
+                "company_name": "Acme Corp",
             },
             files={
                 "resume": ("resume.pdf", b"%PDF lightweight resume", "application/pdf"),
@@ -143,6 +144,7 @@ class AnalysisRouterTest(unittest.TestCase):
             data={
                 "job_title": "Backend Engineer",
                 "job_description": "Build FastAPI services",
+                "company_name": "Acme Corp",
             },
             files={
                 "resume": ("resume.pdf", b"", "application/pdf"),
