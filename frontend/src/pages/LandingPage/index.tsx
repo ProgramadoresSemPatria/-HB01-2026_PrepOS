@@ -1,14 +1,14 @@
 import { Helmet } from "react-helmet-async";
-import LandingHeader from "../components/landing/LandingHeader";
-import { ScrollProgressBar } from "../components/common/ScrollProgressBar";
-import HeroSection from "../components/landing/HeroSection";
-import StackSection from "../components/landing/StackSection";
-import FeaturesSection from "../components/landing/FeaturesSection";
-import HowItWorksSection from "../components/landing/HowItWorksSection";
-import PitchSection from "../components/landing/PitchSection";
-import FaqSection from "../components/landing/FaqSection";
-import CtaSection from "../components/landing/CtaSection";
-import LandingFooter from "../components/landing/LandingFooter";
+import { ScrollProgressBar } from "../../components/common/ScrollProgressBar";
+import LandingHeader from "../../components/landing/LandingHeader";
+import HeroSection from "../../components/landing/HeroSection";
+import StackSection from "../../components/landing/StackSection";
+import FeaturesSection from "../../components/landing/FeaturesSection";
+import HowItWorksSection from "../../components/landing/HowItWorksSection";
+import PitchSection from "../../components/landing/PitchSection";
+import FaqSection from "../../components/landing/FaqSection";
+import CtaSection from "../../components/landing/CtaSection";
+import LandingFooter from "../../components/landing/LandingFooter";
 
 export default function LandingPage() {
   return (
