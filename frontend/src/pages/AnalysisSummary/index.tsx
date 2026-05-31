@@ -72,8 +72,11 @@ export function AnalysisSummaryPage() {
   }, [matchScore, isNewAnalysis]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chatStep, expanded]);
+    messagesEndRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+    });
+  }, [chatStep]);
 
   if (matchScore === null) {
     return (
@@ -86,11 +89,11 @@ export function AnalysisSummaryPage() {
   }
 
   return (
-    <div className="w-full max-w-4xl mx-auto flex flex-col pb-12 px-2 md:px-0">
+    <div className="w-full flex flex-col pb-6 px-2 md:px-0">
       <header className="mb-8 border-b border-gray-800 pb-6 text-center">
         <h1 className="text-2xl text-white font-semibold">Análise de Perfil</h1>
         <p className="text-gray-400 mt-1 text-sm">
-          Prep AI - O seu assistente de carreira
+          CareerSync - Sincronizando você e sua vaga!
         </p>
       </header>
 
@@ -171,9 +174,9 @@ export function AnalysisSummaryPage() {
         {chatStep >= 6 && (
           <AiBubble>
             <p className="text-gray-300 leading-relaxed text-sm md:text-base mb-6">
-              Aqui está o resultado da nossa análise inicial! Este Score indica
-              o quão aderente o seu perfil está em relação às exigências da
-              vaga:
+              Aqui está o resultado da nossa análise inicial! Esta pontuação
+              indica o quão aderente o seu perfil está em relação às exigências
+              da vaga:
             </p>
             <MatchScore score={matchScore} summary={summary} />
           </AiBubble>
@@ -184,13 +187,13 @@ export function AnalysisSummaryPage() {
         {chatStep >= 8 && (
           <AiBubble>
             <p className="text-gray-300 leading-relaxed text-sm md:text-base mb-6">
-              Para alcançarmos os 100% (ou chegarmos muito perto disso na
-              entrevista), notei alguns pontos de atenção no seu currículo.
+              Para alcançar os 100%, ou chegar muito perto disso na
+              entrevista, percebi alguns tópicos sensíveis entre o seu currículo e a vaga pretendida.
               Estes são os{" "}
-              <span className="text-amber-400 font-bold">
-                principais gaps de conhecimento
+              <span className="text-[#3ecf8e] font-bold">
+                principais pontos
               </span>{" "}
-              que precisamos de trabalhar:
+              em que você deve focar agora:
             </p>
             <div className="grid gap-4 md:grid-cols-2">
               {gaps.map((gap) => (
@@ -248,7 +251,7 @@ export function AnalysisSummaryPage() {
                     Desafios Técnicos
                   </span>
                   <span className="block text-gray-500 text-xs mt-0.5">
-                    Problemas focados nos gaps
+                    Problemas focados nestes pontos
                   </span>
                 </div>
               </button>
@@ -265,7 +268,7 @@ export function AnalysisSummaryPage() {
                     Melhorar Pitch
                   </span>
                   <span className="block text-gray-500 text-xs mt-0.5">
-                    Aprenda a vender as suas forças
+                    Aprenda a se vender melhor
                   </span>
                 </div>
               </button>

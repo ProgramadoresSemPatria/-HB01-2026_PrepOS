@@ -22,7 +22,7 @@ declare global {
 const MOCK_QUESTIONS = [
   "Conte-me sobre um momento em que você teve que lidar com um prazo muito apertado e como você gerenciou a situação.",
   "Descreva uma situação onde você discordou de um colega sobre uma decisão técnica. Como vocês resolveram isso?",
-  "Fale sobre um projeto complexo em que você trabalhou. Qual foi o seu papel e o maior desafio que você superou?"
+  "Fale sobre um projeto complexo em que você trabalhou. Qual foi o seu papel e o maior desafio que você superou?",
 ];
 
 // Waveform SVG animada (SMIL, sem CSS extra) para o estado "Recrutador falando…".
@@ -76,7 +76,7 @@ export function InterviewPage() {
   const [isStarted, setIsStarted] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
-  const [transcript, setTranscript] = useState('');
+  const [transcript, setTranscript] = useState("");
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isFinished, setIsFinished] = useState(false);
   const [sttSupported, setSttSupported] = useState(true);
@@ -236,7 +236,7 @@ export function InterviewPage() {
       setIsRecording(false);
       submitAnswer();
     } else {
-      setTranscript('');
+      setTranscript("");
       setEvaluation(null);
       setSttError(null);
       recognitionRef.current.start();
@@ -256,7 +256,7 @@ export function InterviewPage() {
           setIsEvaluating(false);
           setSttError('Não foi possível avaliar a resposta. Tente novamente.');
         },
-      }
+      },
     );
   };
 
@@ -272,16 +272,22 @@ export function InterviewPage() {
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto flex flex-col min-h-[80vh]">
-      
+    <div className="w-full flex flex-col min-h-[80vh]">
       <header className="mb-8 border-b border-gray-800 pb-6 flex flex-col md:flex-row md:justify-between md:items-end gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white">Simulador de Entrevista</h1>
-          <p className="text-[#9a9a9a] mt-2">Vaga alvo: <span className="text-[#3ecf8e] font-semibold">{jobTitle || 'Tecnologia'}</span></p>
+          <h1 className="text-3xl font-bold text-white">
+            Simulador de Entrevista
+          </h1>
+          <p className="text-[#9a9a9a] mt-2">
+            Vaga alvo:{" "}
+            <span className="text-[#3ecf8e] font-semibold">
+              {jobTitle || "Tecnologia"}
+            </span>
+          </p>
         </div>
-        
+
         {!isStarted ? (
-          <button 
+          <button
             onClick={() => setIsStarted(true)}
             className="bg-[#3ecf8e] hover:bg-[#36b37e] text-black px-6 py-2.5 rounded-xl font-bold transition-colors shrink-0"
           >
@@ -489,18 +495,25 @@ export function InterviewPage() {
 
           {transcript && !evaluation && (
             <div className="w-full max-w-3xl bg-[#171717] rounded-xl p-6 border border-gray-800 mb-8">
-              <p className="text-xs text-gray-500 uppercase tracking-wider mb-3 font-bold">Sua Resposta em Tempo Real:</p>
-              <p className="text-gray-300 text-lg leading-relaxed">{transcript}</p>
+              <p className="text-xs text-gray-500 uppercase tracking-wider mb-3 font-bold">
+                Sua Resposta em Tempo Real:
+              </p>
+              <p className="text-gray-300 text-lg leading-relaxed">
+                {transcript}
+              </p>
             </div>
           )}
 
           {evaluation && (
             <div className="w-full max-w-3xl bg-[#202020] rounded-2xl p-6 md:p-8 border border-gray-700 shadow-xl animate-fade-in-up">
-              
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 border-b border-gray-800 pb-6">
                 <div>
-                  <h3 className="text-xl font-bold text-white">Avaliação da IA</h3>
-                  <p className="text-sm text-gray-400 mt-1">Análise da sua última resposta</p>
+                  <h3 className="text-xl font-bold text-white">
+                    Avaliação da IA
+                  </h3>
+                  <p className="text-sm text-gray-400 mt-1">
+                    Análise da sua última resposta
+                  </p>
                 </div>
                 <div className="bg-[#3ecf8e]/10 text-[#3ecf8e] border border-[#3ecf8e]/20 px-5 py-2 rounded-xl font-bold text-lg">
                   Nota: {evaluation.score_1_5} / 5
@@ -526,23 +539,29 @@ export function InterviewPage() {
                     <span className="bg-emerald-500/20 p-1.5 rounded text-emerald-400"><ThumbsUp size={15} /></span> Pontos Fortes
                   </h4>
                   <ul className="list-disc pl-4 text-sm text-gray-300 space-y-2">
-                    {evaluation.strengths.map((str, i) => <li key={i}>{str}</li>)}
+                    {evaluation.strengths.map((str, i) => (
+                      <li key={i}>{str}</li>
+                    ))}
                   </ul>
                 </div>
-                
+
                 <div className="bg-[#171717] p-5 rounded-xl border border-gray-800">
                   <h4 className="text-amber-400 font-bold mb-4 flex items-center gap-2">
                     <span className="bg-amber-500/20 p-1.5 rounded text-amber-400"><Target size={15} /></span> A Melhorar
                   </h4>
                   <ul className="list-disc pl-4 text-sm text-gray-300 space-y-2">
-                    {evaluation.improvements.map((imp, i) => <li key={i}>{imp}</li>)}
+                    {evaluation.improvements.map((imp, i) => (
+                      <li key={i}>{imp}</li>
+                    ))}
                   </ul>
                 </div>
               </div>
 
               <div className="bg-blue-500/5 border border-blue-500/20 p-5 rounded-xl mb-8">
                 <p className="text-sm text-gray-300 leading-relaxed">
-                  <strong className="text-blue-400 block mb-1">Dica Estratégica:</strong> 
+                  <strong className="text-blue-400 block mb-1">
+                    Dica Estratégica:
+                  </strong>
                   {evaluation.tip}
                 </p>
               </div>
@@ -567,7 +586,6 @@ export function InterviewPage() {
               </div>
             </div>
           )}
-
         </main>
       ) : (
         <div className="flex-1 flex items-center justify-center">

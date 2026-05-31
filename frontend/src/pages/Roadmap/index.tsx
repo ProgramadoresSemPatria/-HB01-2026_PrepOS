@@ -89,18 +89,17 @@ export function RoadmapPage() {
   }
 
   const isLoading = isFetching && roadmap.length === 0;
-  const showError = !isLoading && roadmap.length === 0 && !!fetchError && !!analysisId;
+  const showError =
+    !isLoading && roadmap.length === 0 && !!fetchError && !!analysisId;
   const showEmpty = !analysisId;
 
   const showChallengeCta = completedDays >= CHALLENGE_CTA_THRESHOLD;
   const isFullyComplete = completedDays === TOTAL_DAYS;
 
   return (
-    <div className="w-full max-w-3xl mx-auto pb-12">
+    <div className="w-full pb-6">
       <header className="mb-8 border-b border-gray-800 pb-6">
-        <h1 className="text-3xl font-bold text-white">
-          Seu Roadmap de Estudo
-        </h1>
+        <h1 className="text-3xl font-bold text-white">Seu Roadmap de Estudo</h1>
         <p className="text-[#9a9a9a] mt-2 text-sm md:text-base">
           Um plano de 7 dias para fechar seus gaps até a entrevista.
         </p>
