@@ -11,21 +11,23 @@ from models.schemas import (
     ContextResponse,
     Gap,
     InterviewEvaluateResponse,
+    InterviewRound,
     InterviewStartResponse,
-    LeetCodeEvaluateResponse,
-    LeetCodeProblem,
+    InterviewSummaryResponse,
     PitchCard,
     RoadmapTask,
+    StrategicQuestion,
 )
 from services.prompts import (
     ANALYZE_SYSTEM_PROMPT,
     CONTEXT_SYSTEM_PROMPT,
     INTERVIEW_EVAL_SYSTEM_PROMPT,
     INTERVIEW_QUESTIONS_SYSTEM_PROMPT,
-    LEETCODE_EVAL_SYSTEM_PROMPT,
+    INTERVIEW_SUMMARY_SYSTEM_PROMPT,
     LEETCODE_SYSTEM_PROMPT,
     PITCH_SYSTEM_PROMPT,
     ROADMAP_SYSTEM_PROMPT,
+    STRATEGIC_QUESTIONS_SYSTEM_PROMPT,
 )
 
 logger = logging.getLogger(__name__)
@@ -141,21 +143,16 @@ class LLMService:
         )
         return ContextResponse(**data)
 
-    async def get_leetcode_problems(self, stack: str, seniority: str, gaps: str) -> list[LeetCodeProblem]:
+    async def get_leetcode_problems(self, catalog: list[dict], gaps: str) -> list[dict]:
+        """Pede à LLM que escolha slugs do catálogo. Retorna lista bruta de
+        {slug, reason}; validação e montagem canônica ficam no endpoint (acesso ao DB)."""
+        catalog_json = json.dumps(catalog, ensure_ascii=False)
         data = await self._chat_json(
             LEETCODE_SYSTEM_PROMPT,
-            f"Stack: {stack}\nSeniority: {seniority}\nGaps: {gaps}",
+            f"Catálogo disponível:\n{catalog_json}\n\nGaps do candidato: {gaps}",
         )
-        # Chave "problems" agora é explícita no prompt — contrato determinista.
-        problems = data.get("problems", [])
-        return [LeetCodeProblem(**p) for p in problems]
-
-    async def evaluate_leetcode(self, slug: str, title: str, description: str, solution: str, language: str) -> LeetCodeEvaluateResponse:
-        data = await self._chat_json(
-            LEETCODE_EVAL_SYSTEM_PROMPT,
-            f"Problem: {title} ({slug})\nDescription:\n{description}\nLanguage: {language}\nSolution:\n{solution}",
-        )
-        return LeetCodeEvaluateResponse(**data)
+        # Chave "problems" explícita no prompt — contrato determinista.
+        return data.get("problems", [])
 
     async def generate_pitch(self, candidate_json: dict, job_json: dict) -> list[PitchCard]:
         # json já está importado no topo do módulo — import local era desnecessário.
@@ -167,6 +164,24 @@ class LLMService:
         cards = data.get("cards", [])
         return [PitchCard(**c) for c in cards]
 
+    async def generate_strategic_questions(
+        self,
+        job_title: str,
+        job_description: str,
+        company_name: str,
+    ) -> list[StrategicQuestion]:
+        data = await self._chat_json(
+            STRATEGIC_QUESTIONS_SYSTEM_PROMPT,
+            "\n\n".join([
+                f"<company_name>\n{company_name}\n</company_name>",
+                f"<job_title>\n{job_title}\n</job_title>",
+                f"<job_description>\n{job_description}\n</job_description>",
+            ]),
+        )
+        # Chave "questions" é explícita no prompt — contrato determinista.
+        questions = data.get("questions", [])
+        return [StrategicQuestion(**q) for q in questions]
+
     async def generate_interview_questions(self, gaps: list[str], session_id: str) -> InterviewStartResponse:
         data = await self._chat_json(
             INTERVIEW_QUESTIONS_SYSTEM_PROMPT,
@@ -175,8 +190,20 @@ class LLMService:
         return InterviewStartResponse(**data)
 
     async def evaluate_interview(self, question: str, transcript: str, gaps: list[str], round: int) -> InterviewEvaluateResponse:
+        # score_1_5 é derivado das 3 dimensões no próprio schema (ver
+        # InterviewEvaluateResponse._derive_score) — não confiamos na média do LLM.
         data = await self._chat_json(
             INTERVIEW_EVAL_SYSTEM_PROMPT,
             f"Round: {round}\nGaps: {', '.join(gaps)}\nQuestion: {question}\nAnswer: {transcript}",
         )
         return InterviewEvaluateResponse(**data)
+
+    async def summarize_interview(self, rounds: list[InterviewRound]) -> InterviewSummaryResponse:
+        history = json.dumps([r.model_dump() for r in rounds], ensure_ascii=False)
+        data = await self._chat_json(
+            INTERVIEW_SUMMARY_SYSTEM_PROMPT,
+            f"Histórico das rodadas:\n{history}",
+        )
+        # rounds_completed é determinístico: vem do backend, não do LLM.
+        data["rounds_completed"] = len(rounds)
+        return InterviewSummaryResponse(**data)

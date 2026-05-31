@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 const API = import.meta.env.VITE_API_URL ?? "http://127.0.0.1:8000";
 
@@ -55,16 +55,9 @@ export interface LeetCodeProblem {
   title: string;
   difficulty: "Easy" | "Medium" | "Hard";
   category: string;
+  url: string;
+  description: string;
   reason: string;
-}
-
-export interface LeetCodeEvaluateResponse {
-  correct: boolean;
-  time_complexity: string;
-  space_complexity: string;
-  strengths: string[];
-  improvements: string[];
-  optimal_hint: string;
 }
 
 export interface PitchCard {
@@ -75,13 +68,31 @@ export interface PitchCard {
   result: string;
   vaga_connection: string;
   relevance: string;
+  relevance_level: "alta" | "media";
+}
+
+export interface StrategicQuestion {
+  question: string;
+  type: "cultura" | "tecnico" | "desafios";
+  why_strategic: string;
 }
 
 export interface InterviewEvaluateResponse {
+  clarity_1_5: number;
+  star_1_5: number;
+  technical_1_5: number;
   score_1_5: number;
   strengths: string[];
   improvements: string[];
   tip: string;
+}
+
+export interface InterviewSummaryResponse {
+  overall_score_1_5: number;
+  rounds_completed: number;
+  strengths: string[];
+  improvements: string[];
+  final_tip: string;
 }
 
 async function apiRequest<T>(url: string, init?: RequestInit): Promise<T> {
@@ -94,6 +105,7 @@ async function apiRequest<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 export function useCreateAnalysis() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (form: FormData): Promise<AnalysisResult> => {
       const { analysis_id } = await apiRequest<AnalysisCreateResponse>(
@@ -104,6 +116,17 @@ export function useCreateAnalysis() {
         `${API}/analysis/${encodeURIComponent(analysis_id)}/summary`,
       );
       return { analysisId: analysis_id, ...summary };
+    },
+    onSuccess: ({ analysisId }) => {
+      // Gera/cacheia as recomendações logo após o match — página fica instantânea.
+      // Non-blocking: a página ainda funciona standalone se o prefetch falhar.
+      void queryClient.prefetchQuery({
+        queryKey: ["analysis-code-challenges", analysisId],
+        queryFn: () =>
+          apiRequest<LeetCodeProblem[]>(
+            `${API}/analysis/${encodeURIComponent(analysisId)}/code-challenges`,
+          ),
+      });
     },
   });
 }
@@ -158,6 +181,35 @@ export function useAnalysisPitch(analysisId: string) {
   });
 }
 
+export function useStrategicQuestions(analysisId: string) {
+  return useQuery({
+    queryKey: ["analysis-strategic-questions", analysisId],
+    queryFn: () =>
+      apiRequest<StrategicQuestion[]>(
+        `${API}/analysis/${encodeURIComponent(analysisId)}/strategic-questions`,
+      ),
+    enabled: !!analysisId,
+    retry: false,
+    staleTime: Infinity,
+  });
+}
+
+export function useRegenerateStrategicQuestions(analysisId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      apiRequest<StrategicQuestion[]>(
+        `${API}/analysis/${encodeURIComponent(analysisId)}/strategic-questions?refresh=true`,
+      ),
+    onSuccess: (data) => {
+      queryClient.setQueryData(
+        ["analysis-strategic-questions", analysisId],
+        data,
+      );
+    },
+  });
+}
+
 export function useAnalysisInterviewQuestions(analysisId: string) {
   return useQuery({
     queryKey: ["analysis-interview-questions", analysisId],
@@ -177,6 +229,7 @@ export function useEvaluateInterviewAnswer(analysisId: string) {
       question: string;
       transcript: string;
       gaps: string[];
+      round: number;
     }) =>
       apiRequest<InterviewEvaluateResponse>(
         `${API}/analysis/${encodeURIComponent(analysisId)}/evaluate-interview-answer`,
@@ -189,6 +242,23 @@ export function useEvaluateInterviewAnswer(analysisId: string) {
   });
 }
 
+/**
+ * Busca o resumo final consolidado das rodadas da entrevista. Disparado sob
+ * demanda (enabled) ao término da simulação — o backend gera sem cache.
+ */
+export function useInterviewSummary(analysisId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["interview-summary", analysisId],
+    queryFn: () =>
+      apiRequest<InterviewSummaryResponse>(
+        `${API}/analysis/${analysisId}/interview-summary`
+      ),
+    enabled: !!analysisId && enabled,
+    retry: false,
+    staleTime: Infinity,
+  });
+}
+
 export function useContext(gapId: string) {
   return useQuery({
     queryKey: ["context", gapId],
@@ -198,20 +268,42 @@ export function useContext(gapId: string) {
   });
 }
 
-export function useEvaluateSolution() {
+export function useInterviewTTS() {
   return useMutation({
-    mutationFn: (body: {
-      analysis_id: string;
-      slug: string;
-      title: string;
-      description: string;
-      solution: string;
-      language: string;
-    }) =>
-      apiRequest<LeetCodeEvaluateResponse>(`${API}/evaluate-solution`, {
+    mutationFn: async (body: {
+      question_text: string;
+      voice?: "alloy" | "nova";
+    }): Promise<ArrayBuffer> => {
+      const res = await fetch(`${API}/interview/tts`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      }),
+        body: JSON.stringify({ voice: "alloy", ...body }),
+      });
+      if (!res.ok || !res.body) {
+        const err = await res
+          .json()
+          .catch(() => ({ detail: "Falha ao gerar o áudio." }));
+        throw new Error((err as { detail: string }).detail ?? "Falha no TTS.");
+      }
+
+      // Consome o ReadableStream chunk a chunk e remonta num único ArrayBuffer,
+      // pronto para AudioContext.decodeAudioData().
+      const reader = res.body.getReader();
+      const chunks: Uint8Array[] = [];
+      let total = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        total += value.length;
+      }
+      const merged = new Uint8Array(total);
+      let offset = 0;
+      for (const chunk of chunks) {
+        merged.set(chunk, offset);
+        offset += chunk.length;
+      }
+      return merged.buffer;
+    },
   });
 }

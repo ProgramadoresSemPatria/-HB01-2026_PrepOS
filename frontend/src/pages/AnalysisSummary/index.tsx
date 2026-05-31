@@ -154,7 +154,6 @@ export function AnalysisSummaryPage() {
           <AiBubble>
             <p className="text-gray-300 leading-relaxed text-sm md:text-base">
               Vaga interessante... e o seu currículo é mais interessante ainda!
-              🧐
             </p>
           </AiBubble>
         )}
@@ -165,7 +164,7 @@ export function AnalysisSummaryPage() {
           <AiBubble>
             <p className="text-gray-300 leading-relaxed text-sm md:text-base">
               Deixa-me olhar com cuidado para começarmos a nossa preparação da
-              melhor forma possível... 🚀
+              melhor forma possível...
             </p>
           </AiBubble>
         )}

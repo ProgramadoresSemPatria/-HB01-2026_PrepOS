@@ -2,24 +2,25 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Response, UploadFile
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from core.database import get_session
-from models.db_models import Analysis
+from models.db_models import Analysis, LeetcodeProblem
 from models.schemas import (
     AnalysisCreateResponse,
     AnalysisDetailResponse,
     AnalyzeResponse,
     EvaluateInterviewAnswerRequest,
-    EvaluateSolutionRequest,
     Gap,
     InterviewEvaluateResponse,
+    InterviewRound,
     InterviewStartResponse,
-    LeetCodeEvaluateResponse,
+    InterviewSummaryResponse,
     LeetCodeProblem,
     PitchCard,
     ResumeMeta,
     RoadmapTask,
+    StrategicQuestion,
 )
 from services.llm_service import LLMService
 from services.pdf_service import PDFService
@@ -78,6 +79,7 @@ async def create_analysis(
     resume: UploadFile,
     job_title: str = Form(...),
     job_description: str = Form(...),
+    company_name: str = Form(...),
     pdf_svc: PDFService = Depends(),
     db: Session = Depends(get_session),
 ) -> AnalysisCreateResponse:
@@ -86,6 +88,7 @@ async def create_analysis(
     analysis = Analysis(
         job_title=job_title,
         job_description=job_description,
+        company_name=company_name,
         resume=contents,
         resume_text=resume_text,
     )
@@ -158,23 +161,131 @@ async def get_roadmap(
     return await get_or_generate(db, analysis_id, "roadmap", generate)
 
 
+_TARGET_MIN = 6
+_TARGET_MAX = 8
+
+
+def _load_catalog(db: Session) -> dict[str, LeetcodeProblem]:
+    rows = db.exec(select(LeetcodeProblem)).all()
+    return {r.slug: r for r in rows}
+
+
+def _canonical(row: LeetcodeProblem, reason: str) -> dict:
+    return {
+        "slug": row.slug,
+        "title": row.title,
+        "difficulty": row.difficulty,
+        "category": row.category,
+        "url": row.url,
+        "description": row.description,
+        "reason": reason,
+    }
+
+
+def _generic_reason(row: LeetcodeProblem) -> str:
+    return f"Selecionado por cobrir {row.category}, alinhado aos seus gaps."
+
+
+def _fallback_fill(
+    selected: list[dict],
+    catalog: dict[str, LeetcodeProblem],
+    gaps_str: str,
+) -> None:
+    """Preenche `selected` até _TARGET_MIN: primeiro por match de categoria com os
+    gaps (case-insensitive), depois pela ordem restante do catálogo."""
+    chosen = {p["slug"] for p in selected}
+    gaps_lower = gaps_str.lower()
+    remaining = [r for slug, r in catalog.items() if slug not in chosen]
+
+    by_match = [r for r in remaining if r.category.lower() in gaps_lower]
+    others = [r for r in remaining if r.category.lower() not in gaps_lower]
+
+    for row in by_match + others:
+        if len(selected) >= _TARGET_MIN:
+            break
+        selected.append(_canonical(row, _generic_reason(row)))
+
+
+async def _generate_problems(
+    db: Session,
+    analysis: Analysis,
+    llm: LLMService,
+    catalog: dict[str, LeetcodeProblem],
+) -> list[dict]:
+    gaps = await _ensure_gaps(db, analysis, llm)
+    gaps_str = ", ".join(g.skill for g in gaps)
+    compact = [
+        {"slug": r.slug, "title": r.title, "difficulty": r.difficulty, "category": r.category}
+        for r in catalog.values()
+    ]
+
+    try:
+        raw = await llm.get_leetcode_problems(compact, gaps_str)
+    except HTTPException:
+        raw = []
+
+    selected: list[dict] = []
+    seen: set[str] = set()
+    for item in raw:
+        slug = item.get("slug")
+        if slug in catalog and slug not in seen:
+            seen.add(slug)
+            reason = item.get("reason") or _generic_reason(catalog[slug])
+            selected.append(_canonical(catalog[slug], reason))
+
+    selected = selected[:_TARGET_MAX]
+    if len(selected) < _TARGET_MIN:
+        _fallback_fill(selected, catalog, gaps_str)
+    return selected
+
+
+def _hydrate(
+    cached: list[dict],
+    catalog: dict[str, LeetcodeProblem],
+) -> tuple[list[dict], bool]:
+    """Hidrata itens cacheados contra o catálogo por slug. Retorna
+    (hidratados, stale). stale=True se algum item não tem url e não casa no catálogo."""
+    hydrated: list[dict] = []
+    for item in cached:
+        row = catalog.get(item.get("slug"))
+        if row is not None:
+            hydrated.append(_canonical(row, item.get("reason") or _generic_reason(row)))
+        elif item.get("url"):
+            hydrated.append(item)
+        else:
+            return [], True
+    return hydrated, False
+
+
 @router.get("/analysis/{analysis_id}/code-challenges", response_model=list[LeetCodeProblem])
 async def get_code_challenges(
     analysis_id: str,
     llm: LLMService = Depends(),
     db: Session = Depends(get_session),
 ) -> Any:
-    async def generate(analysis: Analysis) -> list[dict]:
-        gaps = await _ensure_gaps(db, analysis, llm)
-        gaps_str = ", ".join(g.skill for g in gaps)
-        problems = await llm.get_leetcode_problems(
-            stack=analysis.job_title,
-            seniority="",
-            gaps=gaps_str,
-        )
-        return [p.model_dump() for p in problems]
+    catalog = _load_catalog(db)
+    if not catalog:
+        raise HTTPException(status_code=503, detail="catálogo LeetCode vazio")
 
-    return await get_or_generate(db, analysis_id, "code_challenges", generate)
+    analysis = _get_analysis_or_404(db, analysis_id)
+    cached = analysis.code_challenges
+
+    if cached:
+        hydrated, stale = _hydrate(cached, catalog)
+        if not stale:
+            if hydrated != cached:
+                analysis.code_challenges = hydrated
+                db.add(analysis)
+                db.commit()
+                db.refresh(analysis)
+            return hydrated
+
+    problems = await _generate_problems(db, analysis, llm, catalog)
+    analysis.code_challenges = problems
+    db.add(analysis)
+    db.commit()
+    db.refresh(analysis)
+    return problems
 
 
 @router.get("/analysis/{analysis_id}/pitch", response_model=list[PitchCard])
@@ -209,18 +320,31 @@ async def get_interview_questions(
     return await get_or_generate(db, analysis_id, "interview_questions", generate)
 
 
-@router.post("/evaluate-solution", response_model=LeetCodeEvaluateResponse)
-async def evaluate_solution(
-    req: EvaluateSolutionRequest,
+@router.get("/analysis/{analysis_id}/strategic-questions", response_model=list[StrategicQuestion])
+async def get_strategic_questions(
+    analysis_id: str,
+    refresh: bool = False,
     llm: LLMService = Depends(),
-) -> LeetCodeEvaluateResponse:
-    return await llm.evaluate_leetcode(
-        req.slug,
-        req.title,
-        req.description,
-        req.solution,
-        req.language,
-    )
+    db: Session = Depends(get_session),
+) -> Any:
+    async def generate(analysis: Analysis) -> list[dict]:
+        questions = await llm.generate_strategic_questions(
+            job_title=analysis.job_title,
+            job_description=analysis.job_description,
+            company_name=analysis.company_name or "",
+        )
+        return [q.model_dump() for q in questions]
+
+    # refresh=true ignora o cache e regenera (usado pelo botão "Regenerar").
+    if refresh:
+        analysis = _get_analysis_or_404(db, analysis_id)
+        analysis.strategic_questions = await generate(analysis)
+        db.add(analysis)
+        db.commit()
+        db.refresh(analysis)
+        return analysis.strategic_questions
+
+    return await get_or_generate(db, analysis_id, "strategic_questions", generate)
 
 
 @router.post(
@@ -233,5 +357,50 @@ async def evaluate_interview_answer(
     llm: LLMService = Depends(),
     db: Session = Depends(get_session),
 ) -> InterviewEvaluateResponse:
-    _get_analysis_or_404(db, analysis_id)
-    return await llm.evaluate_interview(req.question, req.transcript, req.gaps, round=1)
+    analysis = db.get(Analysis, analysis_id)
+    if analysis is None:
+        raise HTTPException(status_code=404, detail="Análise não encontrada.")
+
+    evaluation = await llm.evaluate_interview(
+        req.question, req.transcript, req.gaps, round=req.round
+    )
+
+    # Upsert por round no histórico: refazer uma rodada substitui o item antigo
+    # em vez de duplicar, mantendo no máximo 3 rodadas ordenadas.
+    record = InterviewRound(
+        round=req.round,
+        question=req.question,
+        transcript=req.transcript,
+        evaluation=evaluation,
+    ).model_dump()
+    rounds = [r for r in (analysis.interview_rounds or []) if r["round"] != req.round]
+    rounds.append(record)
+    analysis.interview_rounds = sorted(rounds, key=lambda r: r["round"])
+    db.add(analysis)
+    db.commit()
+
+    return evaluation
+
+
+@router.get(
+    "/analysis/{analysis_id}/interview-summary",
+    response_model=InterviewSummaryResponse,
+)
+async def get_interview_summary(
+    analysis_id: str,
+    llm: LLMService = Depends(),
+    db: Session = Depends(get_session),
+) -> InterviewSummaryResponse:
+    analysis = db.get(Analysis, analysis_id)
+    if analysis is None:
+        raise HTTPException(status_code=404, detail="Análise não encontrada.")
+
+    rounds = analysis.interview_rounds or []
+    if not rounds:
+        raise HTTPException(
+            status_code=409,
+            detail="Nenhuma rodada avaliada ainda — responda ao menos uma pergunta.",
+        )
+
+    # Gerado sob demanda (sem cache): refazer uma rodada deve refletir no resumo.
+    return await llm.summarize_interview([InterviewRound(**r) for r in rounds])
