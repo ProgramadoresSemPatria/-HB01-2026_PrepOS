@@ -10,6 +10,7 @@ import { NewAnalysisPage } from "./pages/NewAnalysis";
 import { AnalysisSummaryPage } from "./pages/AnalysisSummary";
 import { useSession } from "./store/session";
 import { Layout } from "./components/Layout";
+import LandingPage from "./pages/LandingPage";
 
 function RequireAnalysis({ children }: { children: ReactNode }) {
   const matchScore = useSession((s) => s.matchScore);
@@ -23,8 +24,8 @@ export function AppRouter() {
       future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
     >
       <Routes>
+        <Route path="/" element={<LandingPage />} />
         <Route element={<Layout />}>
-          <Route path="/" element={<Navigate to="/new" replace />} />
           <Route path="/new" element={<NewAnalysisPage />} />
 
           <Route
