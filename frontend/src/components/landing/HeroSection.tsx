@@ -55,13 +55,13 @@ export default function HeroSection() {
               <button
                 type="button"
                 onClick={() => show("register")}
-                className="bg-primary-500 hover:bg-primary-600 text-black px-5 py-3 rounded-md text-sm font-semibold"
+                className="btn-primary px-5 py-3 text-sm"
               >
                 Começar gratuitamente
               </button>
               <a
                 href="#how-it-works"
-                className="text-sm text-primary-600 hover:underline"
+                className="text-sm text-primary-600 hover:underline transition-colors"
               >
                 Ver como funciona
               </a>

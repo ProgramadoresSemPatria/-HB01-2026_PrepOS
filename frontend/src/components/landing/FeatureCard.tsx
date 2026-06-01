@@ -10,9 +10,9 @@ export default function FeatureCard({
   children: ReactNode;
 }) {
   return (
-    <div className="h-full bg-[#202020] border border-neutral-700 rounded-lg p-6 hover:shadow-md hover:-translate-y-1 transition flex flex-col">
+    <div className="group h-full bg-[#202020] border border-neutral-700 rounded-lg p-6 transition-all duration-300 hover:-translate-y-1 hover:border-primary-500/40 hover:shadow-lg hover:shadow-primary-500/10 flex flex-col">
       <div className="flex items-start gap-4">
-        <div className="p-2 rounded-md flex items-center justify-center bg-primary-500/10 text-primary-600">
+        <div className="p-2 rounded-md flex items-center justify-center bg-primary-500/10 text-primary-600 transition-colors duration-300 group-hover:bg-primary-500/20">
           {icon}
         </div>
         <div>

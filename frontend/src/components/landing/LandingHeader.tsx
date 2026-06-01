@@ -21,13 +21,19 @@ export default function LandingHeader() {
         </div>
 
         <nav className="hidden md:flex gap-6 text-white">
-          <a href="#features" className="hover:text-primary-500">
+          <a
+            href="#features"
+            className="hover:text-primary-500 transition-colors"
+          >
             Funcionalidades
           </a>
-          <a href="#how-it-works" className="hover:text-primary-500">
+          <a
+            href="#how-it-works"
+            className="hover:text-primary-500 transition-colors"
+          >
             Como funciona
           </a>
-          <a href="#faq" className="hover:text-primary-500">
+          <a href="#faq" className="hover:text-primary-500 transition-colors">
             FAQ
           </a>
         </nav>
@@ -35,10 +41,7 @@ export default function LandingHeader() {
         <div className="hidden md:flex items-center gap-3">
           {token ? (
             <>
-              <Link
-                to="/new"
-                className="bg-primary-500 text-black font-semibold hover:bg-primary-600 px-4 py-2 rounded-md transition-colors"
-              >
+              <Link to="/new" className="btn-primary px-4 py-2">
                 Ir para plataforma
               </Link>
               <button
@@ -53,7 +56,7 @@ export default function LandingHeader() {
             <button
               type="button"
               onClick={() => show("register")}
-              className="bg-primary-500 text-black font-semibold hover:bg-primary-600 px-4 py-2 rounded-md transition-colors"
+              className="btn-primary px-4 py-2"
             >
               Começar agora
             </button>
@@ -86,7 +89,7 @@ export default function LandingHeader() {
                 <Link
                   to="/new"
                   onClick={() => setOpen(false)}
-                  className="mt-2 bg-primary-500 text-black font-bold hover:bg-primary-600 px-3 py-2 rounded-md transition-colors text-center"
+                  className="btn-primary mt-2 px-3 py-2 text-center"
                 >
                   Ir para plataforma
                 </Link>
@@ -108,7 +111,7 @@ export default function LandingHeader() {
                   show("register");
                   setOpen(false);
                 }}
-                className="mt-2 bg-primary-500 text-black font-bold hover:bg-primary-600 px-3 py-2 rounded-md transition-colors"
+                className="btn-primary mt-2 px-3 py-2"
               >
                 Começar agora
               </button>

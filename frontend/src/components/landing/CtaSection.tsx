@@ -38,7 +38,7 @@ export default function CtaSection() {
           <button
             type="button"
             onClick={() => show("register")}
-            className="inline-block bg-primary-500 text-black px-5 py-3 rounded-md font-semibold hover:bg-primary-600 transition-colors"
+            className="btn-primary inline-block px-5 py-3"
           >
             Fazer uma análise gratuita
           </button>
