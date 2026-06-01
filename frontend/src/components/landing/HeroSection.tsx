@@ -16,7 +16,7 @@ export default function HeroSection() {
           >
             <div className="inline-flex items-center gap-2 bg-[#202020] border border-gray-700 text-gray-50 px-3 py-1 rounded-full text-sm">
               <span>⚡</span>
-              <span>Powered by AI</span>
+              <span>Impulsionado por IA</span>
             </div>
           </AnimatedSection>
 
