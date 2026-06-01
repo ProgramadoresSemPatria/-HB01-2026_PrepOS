@@ -17,7 +17,6 @@ interface AnimatedSectionProps {
   duration?: number; // ms
   className?: string;
   threshold?: number;
-  as?: keyof React.JSX.IntrinsicElements;
 }
 
 const animationVariants: Record<AnimationType, Variants> = {
@@ -45,14 +44,12 @@ export function AnimatedSection({
   duration = 600,
   className,
   threshold = 0.15,
-  as: Tag = "div",
 }: AnimatedSectionProps) {
-  const { ref, isVisible } = useScrollReveal({ threshold });
-  const MotionTag: any = (motion as any)[Tag] ?? motion.div;
+  const { ref, isVisible } = useScrollReveal<HTMLDivElement>({ threshold });
 
   return (
-    <MotionTag
-      ref={ref as any}
+    <motion.div
+      ref={ref}
       initial="hidden"
       animate={isVisible ? "visible" : "hidden"}
       variants={animationVariants[animation]}
@@ -64,7 +61,7 @@ export function AnimatedSection({
       className={className}
     >
       {children}
-    </MotionTag>
+    </motion.div>
   );
 }
 

@@ -12,6 +12,14 @@ import { RecruiterQuestions } from '../../components/RecruiterQuestions';
 
 const TOTAL_ROUNDS = 3;
 
+type AudioContextWindow = Window &
+  typeof globalThis & {
+    webkitAudioContext?: typeof AudioContext;
+  };
+
+const getSpeechRecognitionConstructor = () =>
+  window.SpeechRecognition || window.webkitSpeechRecognition;
+
 const MOCK_QUESTIONS = [
   "Conte-me sobre um momento em que você teve que lidar com um prazo muito apertado e como você gerenciou a situação.",
   "Descreva uma situação onde você discordou de um colega sobre uma decisão técnica. Como vocês resolveram isso?",
@@ -72,7 +80,7 @@ export function InterviewPage() {
   const [transcript, setTranscript] = useState("");
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isFinished, setIsFinished] = useState(false);
-  const [sttSupported, setSttSupported] = useState(true);
+  const [sttSupported] = useState(() => Boolean(getSpeechRecognitionConstructor()));
   const [sttError, setSttError] = useState<string | null>(null);
   // A simulação tem exatamente TOTAL_ROUNDS rodadas: usamos as 3 primeiras
   // perguntas (sem ciclar) e encerramos com o resumo final.
@@ -106,8 +114,9 @@ export function InterviewPage() {
 
   const getAudioContext = () => {
     if (!audioCtxRef.current) {
-      const Ctx =
-        window.AudioContext || (window as any).webkitAudioContext;
+      const audioWindow = window as AudioContextWindow;
+      const Ctx = audioWindow.AudioContext || audioWindow.webkitAudioContext;
+      if (!Ctx) throw new Error("Web Audio API indisponível.");
       audioCtxRef.current = new Ctx();
     }
     return audioCtxRef.current;
@@ -161,7 +170,10 @@ export function InterviewPage() {
   // Sessão" já liberou o áudio no browser). Em erro, degrada para texto.
   useEffect(() => {
     if (!isStarted || !question) return;
-    playQuestionAudio(question);
+    const timeoutId = window.setTimeout(() => {
+      void playQuestionAudio(question);
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isStarted, question]);
 
@@ -176,10 +188,9 @@ export function InterviewPage() {
   const isRecruiterSpeaking = audioState === 'loading' || audioState === 'speaking';
 
   useEffect(() => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const SpeechRecognition = getSpeechRecognitionConstructor();
     if (!SpeechRecognition) {
       // Web Speech API não existe em Firefox/Safari: degrada para resposta digitada.
-      setSttSupported(false);
       return;
     }
 
@@ -188,7 +199,7 @@ export function InterviewPage() {
     recognitionRef.current.interimResults = true;
     recognitionRef.current.lang = 'pt-BR';
 
-    recognitionRef.current.onresult = (event: any) => {
+    recognitionRef.current.onresult = (event: SpeechRecognitionEvent) => {
       let currentTranscript = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
         currentTranscript += event.results[i][0].transcript;
@@ -196,7 +207,7 @@ export function InterviewPage() {
       setTranscript(currentTranscript);
     };
 
-    recognitionRef.current.onerror = (event: any) => {
+    recognitionRef.current.onerror = (event: SpeechRecognitionErrorEvent) => {
       console.error("Erro no reconhecimento de voz:", event.error);
       const messages: Record<string, string> = {
         'not-allowed': 'Acesso ao microfone negado. Libere a permissão no navegador e tente novamente.',

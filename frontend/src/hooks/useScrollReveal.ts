@@ -7,9 +7,9 @@ interface UseScrollRevealOptions {
   once?: boolean;
 }
 
-export function useScrollReveal(options: UseScrollRevealOptions = {}) {
+export function useScrollReveal<T extends HTMLElement = HTMLElement>(options: UseScrollRevealOptions = {}) {
   const { threshold = 0.15, rootMargin = "0px 0px -60px 0px", once = true } = options;
-  const ref = useRef<HTMLElement | null>(null);
+  const ref = useRef<T | null>(null);
   // framer-motion useInView accepts amount (threshold) and margin
   const inView = useInView(ref, {
     amount: threshold,
@@ -18,11 +18,14 @@ export function useScrollReveal(options: UseScrollRevealOptions = {}) {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    if (inView) {
-      setIsVisible(true);
-    } else if (!once) {
-      setIsVisible(false);
-    }
+    const timeoutId = window.setTimeout(() => {
+      if (inView) {
+        setIsVisible(true);
+      } else if (!once) {
+        setIsVisible(false);
+      }
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
   }, [inView, once]);
 
   return { ref, isVisible } as const;
